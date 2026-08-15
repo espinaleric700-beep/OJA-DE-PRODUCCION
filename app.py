@@ -3,6 +3,7 @@ import streamlit as st
 from supabase import create_client
 from streamlit_autorefresh import st_autorefresh
 import json
+import re
 
 # ==========================================
 # CONFIGURACIÓN Y ESTILO VISUAL (MODO OSCURO)
@@ -50,8 +51,13 @@ lista_estados = [
 
 tallas_disponibles = ["2", "4", "6", "8", "10", "12", "14", "16", "S", "M", "WS", "WM", "L", "XL", "2XL"]
 
+def limpiar_nombre_archivo(nombre):
+    # Reemplaza espacios y caracteres especiales para evitar errores en Supabase Storage
+    return re.sub(r'[^a-zA-Z0-9_.-]', '_', nombre)
+
 def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
-    path = f"almacen/{datetime.now().strftime('%Y%m%d%H%M%S')}_{file_name}"
+    nombre_seguro = limpiar_nombre_archivo(file_name)
+    path = f"almacen/{datetime.now().strftime('%Y%m%d%H%M%S')}_{nombre_seguro}"
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 

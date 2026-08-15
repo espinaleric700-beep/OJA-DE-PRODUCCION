@@ -64,6 +64,38 @@ def obtener_siguiente_numero_orden():
         pass
     return "0000001"
 
+def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, historial_actual, usuario_actual):
+    if nuevo_estado == estado_anterior:
+        return
+    
+    # Crear el registro del cambio actual
+    ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    nuevo_registro = {
+        "usuario": usuario_actual,
+        "de": estado_anterior,
+        "a": nuevo_estado,
+        "fecha": ahora
+    }
+    
+    # Parsear el historial existente (puede venir como string JSON o lista)
+    lista_historial = []
+    if historial_actual:
+        if isinstance(historial_actual, str):
+            try:
+                lista_historial = json.loads(historial_actual)
+            except Exception:
+                lista_historial = []
+        elif isinstance(historial_actual, list):
+            lista_historial = historial_actual
+            
+    lista_historial.insert(0, nuevo_registro)  # Insertar el más reciente al principio
+    
+    # Actualizar en Supabase
+    supabase.table("ordenes").update({
+        "estado": nuevo_estado,
+        "historial_estados": json.dumps(lista_historial)
+    }).eq("id", o_id).execute()
+
 # Estado global inicial
 if "autenticado" not in st.session_state:
     st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
@@ -113,8 +145,9 @@ with tabs[0]:
                 numero_o = o.get('numero_orden', 'S/N')
                 cliente_o = o.get('nombre_cliente', 'Sin cliente')
                 estado_actual = o.get('estado', 'Pendiente')
+                historial_db = o.get('historial_estados', "[]")
                 
-                # Diseño de columnas en la interfaz para integrar el selector rápido a la derecha del expander
+                # Diseño de columnas para incluir el selector rápido en el lateral derecho de la barra
                 col_exp, col_select = st.columns([3.5, 1.5])
                 
                 with col_select:
@@ -127,11 +160,15 @@ with tabs[0]:
                         label_visibility="collapsed"
                     )
                     if nuevo_estado_rapido != estado_actual:
-                        supabase.table("ordenes").update({"estado": nuevo_estado_rapido}).eq("id", o_id).execute()
+                        actualizar_estado_con_historial(
+                            o_id, estado_actual, nuevo_estado_rapido, 
+                            historial_db, st.session_state['usuario']
+                        )
+                        st.success("✅ Estado actualizado rápidamente")
                         st.rerun()
 
                 with col_exp:
-                    with st.expander(f"Orden #{numero_o} - {cliente_o}"):
+                    with st.expander(f"Orden #{numero_o} - {cliente_o} [Estado: {estado_actual}]"):
                         # Solo mostrar datos del cliente y pagos si es Administrador o Recepción
                         if st.session_state['rol'] in ["Administrador", "Recepción"]:
                             col_info1, col_info2 = st.columns(2)
@@ -149,9 +186,29 @@ with tabs[0]:
                         
                         if nuevo_estado_sel != estado_actual:
                             if st.button("💾 Actualizar Estado", key=f"btn_upd_est_{o_id}"):
-                                supabase.table("ordenes").update({"estado": nuevo_estado_sel}).eq("id", o_id).execute()
-                                st.success("✅ ¡Estado actualizado!")
+                                actualizar_estado_con_historial(
+                                    o_id, estado_actual, nuevo_estado_sel, 
+                                    historial_db, st.session_state['usuario']
+                                )
+                                st.success("✅ ¡Estado actualizado y registrado en el historial!")
                                 st.rerun()
+                        
+                        # Mostrar el Historial de Estados
+                        st.markdown("---")
+                        st.markdown("📜 **Historial de Cambios de Estado:**")
+                        try:
+                            registros = json.loads(historial_db) if isinstance(historial_db, str) else historial_db
+                            if registros:
+                                for reg in registros:
+                                    u_cambio = reg.get('usuario', 'Desconocido')
+                                    de_est = reg.get('de', '-')
+                                    a_est = reg.get('a', '-')
+                                    f_cambio = reg.get('fecha', '-')
+                                    st.caption(f"🕒 [{f_cambio}] 👤 **{u_cambio}** cambió el estado de *{de_est}* ➡️ *{a_est}*")
+                            else:
+                                st.caption("No hay cambios registrados todavía.")
+                        except Exception:
+                            st.caption("No se pudo cargar el historial.")
         else:
             st.info("No hay órdenes registradas con este filtro.")
     except Exception as e:
@@ -189,6 +246,14 @@ with tabs[1]:
         if submit_nueva_orden:
             if nombre_cliente.strip():
                 try:
+                    # Crear el historial inicial indicando la creación
+                    historial_inicial = [{
+                        "usuario": st.session_state['usuario'],
+                        "de": "Inicio",
+                        "a": "Pendiente",
+                        "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }]
+                    
                     supabase.table("ordenes").insert({
                         "numero_orden": numero_auto,
                         "nombre_cliente": nombre_cliente,
@@ -199,7 +264,8 @@ with tabs[1]:
                         "abono": abono_orden,
                         "restante": max(0.0, restante_calc),
                         "observaciones": observaciones,
-                        "estado": "Pendiente"
+                        "estado": "Pendiente",
+                        "historial_estados": json.dumps(historial_inicial)
                     }).execute()
                     st.success(f"✅ ¡Orden #{numero_auto} creada y guardada correctamente!")
                     st.rerun()

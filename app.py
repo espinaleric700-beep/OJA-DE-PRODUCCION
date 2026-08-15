@@ -84,6 +84,27 @@ with tabs[0]:
         with st.expander(f"Orden #{o.get('numero_orden')} - {o.get('nombre_cliente')}"):
             st.write(f"Estado: {o.get('estado')}")
 
+with tabs[1]:
+    st.subheader("➕ Crear Nueva Orden")
+    with st.form("form_nueva_orden"):
+        nombre_cliente = st.text_input("Nombre del Cliente")
+        numero_orden = st.text_input("Número de Orden")
+        submit_orden = st.form_submit_button("Guardar Orden")
+        if submit_orden:
+            if nombre_cliente and numero_orden:
+                try:
+                    supabase.table("ordenes").insert({
+                        "numero_orden": numero_orden,
+                        "nombre_cliente": nombre_cliente,
+                        "estado": "Pendiente"
+                    }).execute()
+                    st.success("✅ ¡Orden creada con éxito!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al guardar orden: {e}")
+            else:
+                st.warning("Completa los campos obligatorios.")
+
 with tabs[2]:
     st.subheader("📦 Control de Inventario")
     
@@ -344,4 +365,46 @@ with tabs[2]:
 
 with tabs[3]:
     if st.session_state['rol'] == "Administrador":
-        st.subheader("👥 Usuarios")
+        st.subheader("👥 Gestión de Usuarios")
+        with st.form("form_crear_usuario"):
+            nuevo_user = st.text_input("Nombre de Usuario")
+            nuevo_pass = st.text_input("Contraseña", type="password")
+            nuevo_rol = st.selectbox("Rol Asignado", roles_disponibles)
+            submit_user = st.form_submit_button("Crear Usuario")
+            if submit_user:
+                if nuevo_user and nuevo_pass:
+                    try:
+                        supabase.table("usuarios").insert({
+                            "usuario": nuevo_user,
+                            "password": nuevo_pass,
+                            "rol_id": nuevo_rol
+                        }).execute()
+                        st.success("✅ Usuario creado exitosamente.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al crear usuario: {e}")
+                else:
+                    st.warning("Completa todos los campos.")
+        
+        st.markdown("---")
+        st.subheader("Lista de Usuarios Registrados")
+        try:
+            usuarios_db = supabase.table("usuarios").select("*").execute().data
+            if usuarios_db:
+                for u in usuarios_db:
+                    col_u1, col_u2, col_u3 = st.columns([2, 2, 1])
+                    with col_u1:
+                        st.text(f"👤 {u.get('usuario')}")
+                    with col_u2:
+                        st.text(f"Rol: {u.get('rol_id')}")
+                    with col_u3:
+                        if st.button("🗑️", key=f"del_user_{u.get('id')}"):
+                            supabase.table("usuarios").delete().eq("id", u.get('id')).execute()
+                            st.success("Usuario eliminado")
+                            st.rerun()
+            else:
+                st.info("No hay usuarios adicionales registrados.")
+        except Exception as e:
+            st.error(f"Error al cargar usuarios: {e}")
+    else:
+        st.warning("⚠️ No tienes permisos para acceder a esta sección.")

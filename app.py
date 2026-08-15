@@ -92,48 +92,74 @@ with tabs[0]:
         ordenes = supabase.table("ordenes").select("*").execute().data
         if ordenes:
             for o in ordenes:
-                with st.expander(f"Orden #{o.get('id', 'N/A')} - Cliente: {o.get('cliente', 'General')}"):
+                with st.expander(f"Orden #{o.get('id', 'N/A')} - Cliente: {o.get('cliente', 'General')} [{o.get('area', 'General')}]"):
+                    st.write(f"**Área:** {o.get('area', 'No especificada')}")
                     st.write(f"**Detalles:** {o.get('detalles', 'Sin detalles')}")
                     st.write(f"**Estado:** {o.get('estado', 'Pendiente')}")
-                    if o.get('imagen_url'):
-                        st.image(o.get('imagen_url'), width=250)
+                    
+                    imagenes = o.get('imagen_url')
+                    if imagenes:
+                        # Si se guardó como texto separado por comas o lista
+                        if isinstance(imagenes, str):
+                            lista_imgs = [img.strip() for img in imagenes.split(",") if img.strip()]
+                        else:
+                            lista_imgs = imagenes
+                        
+                        st.write("**Archivos adjuntos:**")
+                        cols = st.columns(min(len(lista_imgs), 4))
+                        for idx, img_url in enumerate(lista_imgs):
+                            with cols[idx % 4]:
+                                st.image(img_url, width=150)
         else:
             st.info("No hay órdenes registradas.")
     except Exception as e:
         st.error(f"Error al cargar las órdenes: {e}")
 
 # ------------------------------------------
-# TAB 1: NUEVA ORDEN
+# TAB 1: NUEVA ORDEN (Restringido a Admin, Diseñador y Recepción)
 # ------------------------------------------
 with tabs[1]:
-    st.subheader("➕ Crear Nueva Orden")
-    with st.form("form_nueva_orden", clear_on_submit=True):
-        cliente = st.text_input("Nombre del Cliente")
-        detalles = st.text_area("Detalles del Diseño / Bordado")
-        archivo = st.file_uploader("Subir Imagen o Referencia", type=["png", "jpg", "jpeg"])
-        
-        if st.form_submit_button("Guardar Orden"):
-            try:
-                imagen_url = ""
-                if archivo is not None:
-                    imagen_url = subir_a_supabase(archivo.getvalue(), archivo.name)
-                
-                supabase.table("ordenes").insert({
-                    "cliente": cliente,
-                    "detalles": detalles,
-                    "imagen_url": imagen_url,
-                    "estado": "Pendiente",
-                    "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }).execute()
-                st.success("✅ Orden creada con éxito.")
-            except Exception as e:
-                st.error(f"Error al guardar la orden: {e}")
+    rol_actual_lower = str(st.session_state.get("rol")).strip().lower()
+    roles_permitidos = ["administrador", "diseñador", "recepción", "recepcion"]
+    
+    if rol_actual_lower not in roles_permitidos:
+        st.error("⛔ Acceso denegado. Solo los roles de Administrador, Diseñador y Recepción pueden crear nuevas órdenes.")
+    else:
+        st.subheader("➕ Crear Nueva Orden")
+        with st.form("form_nueva_orden", clear_on_submit=True):
+            cliente = st.text_input("Nombre del Cliente")
+            area = st.selectbox("Área de Producción", ["Bordado", "Impresión"])
+            detalles = st.text_area("Detalles del Diseño / Requerimientos")
+            archivos = st.file_uploader("Subir Imágenes o Referencias (Múltiples)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+            
+            if st.form_submit_button("Guardar Orden"):
+                try:
+                    urls_imagenes = []
+                    if archivos:
+                        for archivo in archivos:
+                            url = subir_a_supabase(archivo.getvalue(), archivo.name)
+                            urls_imagenes.append(url)
+                    
+                    # Unimos las URLs separadas por comas para guardarlas en la base de datos
+                    imagenes_str = ",".join(urls_imagenes)
+                    
+                    supabase.table("ordenes").insert({
+                        "cliente": cliente,
+                        "area": area,
+                        "detalles": detalles,
+                        "imagen_url": imagenes_str,
+                        "estado": "Pendiente",
+                        "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }).execute()
+                    st.success("✅ Orden creada con éxito.")
+                except Exception as e:
+                    st.error(f"Error al guardar la orden: {e}")
 
 # ------------------------------------------
 # TAB 2: CONFIGURACIÓN / USUARIOS (SOLO ADMIN)
 # ------------------------------------------
 with tabs[2]:
-    if str(st.session_state.get("rol")).strip().lower() != "administrador":
+    if rol_actual_lower != "administrador":
         st.error("⛔ Acceso denegado. Esta sección es exclusiva para el Panel de Administración.")
     else:
         st.subheader("👥 Registrar Nuevo Usuario")
@@ -162,8 +188,8 @@ with tabs[2]:
             usuarios = supabase.table("usuarios").select("*").execute().data
             if usuarios:
                 for u in usuarios:
-                    rol_actual = u.get('rol_id') or u.get('rol') or 'Sin rol'
-                    st.write(f"👤 **{u.get('nombre')}** | Usuario: `{u.get('usuario')}` | Rol: **{rol_actual}**")
+                    rol_usu = u.get('rol_id') or u.get('rol') or 'Sin rol'
+                    st.write(f"👤 **{u.get('nombre')}** | Usuario: `{u.get('usuario')}` | Rol: **{rol_usu}**")
             else:
                 st.info("No hay usuarios registrados.")
         except Exception as e:

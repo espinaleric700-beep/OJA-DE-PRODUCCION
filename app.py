@@ -59,6 +59,20 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
+def obtener_color_texto(hex_code):
+    """Determina si el texto sobre el botón debe ser negro o blanco según el brillo del tono."""
+    try:
+        hex_code = hex_code.lstrip('#')
+        if len(hex_code) == 3:
+            hex_code = ''.join([c*2 for c in hex_code])
+        r = int(hex_code[0:2], 16)
+        g = int(hex_code[2:4], 16)
+        b = int(hex_code[4:6], 16)
+        luminancia = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        return '#000000' if luminancia > 0.55 else '#ffffff'
+    except:
+        return '#ffffff'
+
 if "autenticado" not in st.session_state:
     st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 
@@ -274,25 +288,39 @@ with tabs[2]:
 
                         st.markdown("Colores")
 
-                        # Forzamos mediante CSS que cada botón tenga exactamente el color HEX de fondo registrado
-                        css_botones_dinamicos = ""
+                        # Ancla para localizar exactamente la fila de botones de este producto
+                        st.markdown(f'<div id="anchor_colores_{item_id}"></div>', unsafe_allow_html=True)
+
+                        css_colores = "<style>\n"
                         for idx_c, c_name in enumerate(lista_cols):
                             c_hex = dict_colores[c_name].get("hex", "#3b82f6")
+                            txt_color = obtener_color_texto(c_hex)
                             es_seleccionado = (st.session_state[key_activo] == c_name)
-                            borde_estilo = "3px solid #ffffff" if es_seleccionado else "1px solid rgba(255, 255, 255, 0.3)"
                             
-                            css_botones_dinamicos += f"""
-                            div[data-testid="column"]:has(button#btn_col_{item_id}_{idx_c}) button {{
-                                background-color: {c_hex} !important;
-                                color: #ffffff !important;
-                                border: {borde_estilo} !important;
-                                font-weight: bold !important;
-                                text-shadow: 0px 1px 2px rgba(0,0,0,0.6);
+                            borde = "3px solid #ffffff" if es_seleccionado else "1px solid rgba(255, 255, 255, 0.2)"
+                            box_shadow = f"0 0 10px {c_hex}" if es_seleccionado else "none"
+                            
+                            css_colores += f"""
+                            div:has(#anchor_colores_{item_id}) + div[data-testid="stHorizontalBlock"] > div:nth-child({idx_c + 1}) button {{
+                                background: {c_hex} !important;
+                                color: {txt_color} !important;
+                                border: {borde} !important;
+                                box-shadow: {box_shadow} !important;
+                                font-weight: 800 !important;
+                                font-size: 0.9rem !important;
+                                text-transform: uppercase !important;
+                                border-radius: 6px !important;
+                                min-height: 2.2rem !important;
+                                transition: all 0.2s ease-in-out !important;
+                            }}
+                            div:has(#anchor_colores_{item_id}) + div[data-testid="stHorizontalBlock"] > div:nth-child({idx_c + 1}) button:hover {{
+                                opacity: 0.9 !important;
+                                transform: scale(1.02) !important;
                             }}
                             """
-                        st.markdown(f"<style>{css_botones_dinamicos}</style>", unsafe_allow_html=True)
+                        css_colores += "</style>"
+                        st.markdown(css_colores, unsafe_allow_html=True)
 
-                        # Renderizamos los botones con su respectivo índice numérico interno para evitar colisiones de IDs en Streamlit
                         cols_botones = st.columns(len(lista_cols))
                         for i, c_name in enumerate(lista_cols):
                             with cols_botones[i]:

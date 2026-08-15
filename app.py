@@ -135,12 +135,19 @@ with tab1:
             st.info(f"**Nota Interna:** {o.get('nota_interna', 'Ninguna')}")
 
         with col2:
+          # Mostrar múltiples archivos de diseño si existen
           if o.get("archivo_diseno"):
-            st.markdown(
-                f"[Descargar Archivo de Diseño]({o['archivo_diseno']})"
-            )
-          if o.get("recibo_pago"):
-            st.markdown(f"[Ver Recibo de Pago]({o['recibo_pago']})")
+            st.markdown("**Archivos de Diseño:**")
+            # Soportar tanto texto separado por comas como string único antiguo
+            archivos = o["archivo_diseno"].split(",")
+            for idx, url in enumerate(archivos):
+              if url.strip():
+                st.markdown(f"- [Descargar Diseño {idx + 1}]({url.strip()})")
+
+          # Mostrar recibo de pago (solo visible para Admin y Recepción)
+          if rol_seleccionado in ["Administrador", "Recepción"]:
+            if o.get("recibo_pago"):
+              st.markdown(f"[Ver Recibo de Pago]({o['recibo_pago']})")
 
         # Flujo de Estados y Botón Verde de Acción
         estado = o["estado_actual"]
@@ -243,8 +250,10 @@ with tab2:
         "Nota Interna (Solo Admin y Recepción)"
     )
 
-    archivo_subido = st.file_uploader(
-        "Subir Archivo de Diseño (.emb, .dst, .cdr, .ai, .pdf, etc.)",
+    # Permitir múltiples archivos de diseño
+    archivos_subidos = st.file_uploader(
+        "Subir Archivos de Diseño (Puedes seleccionar varios: .emb, .dst, .cdr,"
+        " .ai, .pdf, etc.)",
         type=[
             "jpg",
             "png",
@@ -257,23 +266,34 @@ with tab2:
             "dst",
             "tbf",
         ],
+        accept_multiple_files=True,
     )
-    recibo_subido = st.file_uploader(
-        "Subir Recibo de Pago", type=["jpg", "png", "pdf"]
-    )
+
+    # El recibo de pago solo se muestra si el rol es Administrador o Recepción
+    recibo_subido = None
+    if rol_seleccionado in ["Administrador", "Recepción"]:
+      recibo_subido = st.file_uploader(
+          "Subir Recibo de Pago (Solo Admin y Recepción)",
+          type=["jpg", "png", "pdf"],
+      )
 
     submit = st.form_submit_button("Crear Orden")
 
     if submit:
       if nombre_cliente and nombre_orden:
-        url_diseno = ""
+        urls_diseno = []
         url_recibo = ""
 
-        if archivo_subido:
-          url_diseno = subir_a_firebase(
-              archivo_subido.getvalue(), archivo_subido.name, "disenos/"
-          )
-        if recibo_subido:
+        # Subir múltiples archivos de diseño
+        if archivos_subidos:
+          for archivo in archivos_subidos:
+            url = subir_a_firebase(
+                archivo.getvalue(), archivo.name, "disenos/"
+            )
+            urls_diseno.append(url)
+
+        # Subir recibo de pago si fue cargado por Admin o Recepción
+        if recibo_subido and rol_seleccionado in ["Administrador", "Recepción"]:
           url_recibo = subir_a_firebase(
               recibo_subido.getvalue(), recibo_subido.name, "recibos/"
           )
@@ -289,7 +309,7 @@ with tab2:
             "fecha_creacion": datetime.now().isoformat(),
             "fecha_entrega": str(fecha_entrega),
             "nota_interna": nota_interna,
-            "archivo_diseno": url_diseno,
+            "archivo_diseno": ",".join(urls_diseno),
             "recibo_pago": url_recibo,
             "creado_por": usuario,
         }

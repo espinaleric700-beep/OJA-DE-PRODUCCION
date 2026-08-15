@@ -97,7 +97,7 @@ mapa_roles = {
 }
 
 # ==========================================
-# VERIFICACIÓN FUERA DEL FRAGMENTO (Evita errores en Sidebar)
+# VERIFICACIÓN FUERA DEL FRAGMENTO
 # ==========================================
 try:
     ordenes_iniciales = supabase.table("ordenes").select("*").execute().data
@@ -126,7 +126,8 @@ def cargar_panel_principal():
     with tab1:
         if ordenes_db:
             for o in ordenes_db:
-                if o["estado_actual"] == "Cancelado": 
+                # Ocultar si está Cancelado o Entregado de la vista principal
+                if o["estado_actual"] in ["Cancelado", "Entregado"]: 
                     continue
                 
                 if busqueda and (busqueda.lower() not in o.get("numero_orden", "").lower() and busqueda.lower() not in o.get("nombre_cliente", "").lower()):

@@ -55,7 +55,7 @@ st.title("🧵 Pixel Thread - Gestión")
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "⚙️ Usuarios"])
 
 # ------------------------------------------
-# TAB 0: VER Y ACTUALIZAR ÓRDENES
+# TAB 0: VER Y FILTRAR ÓRDENES
 # ------------------------------------------
 with tabs[0]:
     st.subheader("📋 Listado y Control de Órdenes")
@@ -63,24 +63,32 @@ with tabs[0]:
         ordenes = supabase.table("ordenes").select("*").execute().data
         lista_estados = ["Pendiente", "Enviado a Recepción", "En Producción", "Regresado a Recepción", "Orden Entregada"]
         
-        for o in ordenes:
-            estado_actual = o.get('estado') or o.get('estado_actual') or 'Pendiente'
+        # --- FILTRO AGREGADO ---
+        estados_filtro = st.multiselect("Filtrar por estado:", lista_estados, default=[])
+        # -----------------------
+        
+        if ordenes:
+            # Aplicar filtro si se seleccionó algo
+            ordenes_a_mostrar = [o for o in ordenes if (o.get('estado') or o.get('estado_actual')) in estados_filtro] if estados_filtro else ordenes
             
-            with st.expander(f"Orden #{o.get('numero_orden', 'N/A')} - Cliente: {o.get('nombre_cliente', 'N/A')}"):
-                st.write(f"**Área:** {o.get('area_produccion', 'N/A')} | **Detalles:** {o.get('nombre_orden', 'N/A')}")
+            for o in ordenes_a_mostrar:
+                estado_actual = o.get('estado') or o.get('estado_actual') or 'Pendiente'
                 
-                # Selector de estado libre para cualquier usuario
-                idx_actual = lista_estados.index(estado_actual) if estado_actual in lista_estados else 0
-                nuevo_estado = st.selectbox(f"Estado Orden {o.get('numero_orden')}", lista_estados, index=idx_actual, key=f"sel_{o.get('id')}")
-                
-                if st.button("💾 Actualizar Estado", key=f"btn_{o.get('id')}"):
-                    supabase.table("ordenes").update({"estado": nuevo_estado, "estado_actual": nuevo_estado}).eq("id", o.get("id")).execute()
-                    st.rerun()
+                with st.expander(f"Orden #{o.get('numero_orden', 'N/A')} - Cliente: {o.get('nombre_cliente', 'N/A')} | Estado: {estado_actual}"):
+                    st.write(f"**Área:** {o.get('area_produccion', 'N/A')} | **Detalles:** {o.get('nombre_orden', 'N/A')}")
+                    
+                    nuevo_estado = st.selectbox(f"Cambiar estado #{o.get('numero_orden')}", lista_estados, index=lista_estados.index(estado_actual) if estado_actual in lista_estados else 0, key=f"sel_{o.get('id')}")
+                    
+                    if st.button("💾 Actualizar", key=f"btn_{o.get('id')}"):
+                        supabase.table("ordenes").update({"estado": nuevo_estado, "estado_actual": nuevo_estado}).eq("id", o.get("id")).execute()
+                        st.rerun()
 
-                if o.get('factura_url'):
-                    st.markdown(f"📄 [Ver Factura]({o.get('factura_url')})")
+                    if o.get('factura_url'):
+                        st.markdown(f"📄 [Ver Factura]({o.get('factura_url')})")
+        else:
+            st.info("No hay órdenes registradas.")
     except Exception as e:
-        st.error(f"Error al cargar: {e}")
+        st.error(f"Error al cargar órdenes: {e}")
 
 # ------------------------------------------
 # TAB 1: NUEVA ORDEN

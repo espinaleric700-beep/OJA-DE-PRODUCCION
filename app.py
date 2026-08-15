@@ -43,7 +43,6 @@ if not st.session_state["autenticado"]:
     if st.sidebar.button("Iniciar Sesión"):
         if not usuario_input or not password_input:
             st.sidebar.warning("Por favor ingresa usuario y contraseña.")
-        # Acceso maestro de administrador directo
         elif usuario_input.strip().lower() == "admin" and password_input == "2580Admin":
             st.session_state["autenticado"] = True
             st.session_state["usuario"] = "admin"
@@ -94,6 +93,7 @@ with tabs[2]: # Pestaña de Configuración
                     "rol": n_rol
                 }).execute()
                 st.success("✅ Usuario creado con éxito.")
+                st.rerun()
             except Exception as e:
                 st.error(f"Error al registrar usuario: {e}")
 

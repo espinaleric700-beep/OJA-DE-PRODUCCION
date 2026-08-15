@@ -27,16 +27,17 @@ SUPABASE_KEY = st.secrets["supabase"]["key"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==========================================
-# CARGA DINÁMICA DE ROLES
+# ROLES DISPONIBLES (SEGURO)
 # ==========================================
-def obtener_roles():
-    try:
-        res = supabase.table("rol").select("id").execute()
-        return [r["id"] for r in res.data]
-    except:
-        return ["Administrador", "Recepción", "Diseñador", "Almacén", "Producción - Bordados", "Producción - Impresión", "Producción - Transferencia Térmica"]
-
-roles_disponibles = obtener_roles()
+roles_disponibles = [
+    "Administrador", 
+    "Recepción", 
+    "Diseñador", 
+    "Almacén", 
+    "Producción - Bordados", 
+    "Producción - Impresión", 
+    "Producción - Transferencia Térmica"
+]
 
 def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     path = f"ordenes/{datetime.now().strftime('%Y%m%d%H%M%S')}_{file_name}"
@@ -129,5 +130,6 @@ with tabs[2]:
             n_rol = st.selectbox("Rol Asignado", roles_disponibles)
             if st.form_submit_button("Guardar Usuario"):
                 supabase.table("usuarios").insert({"nombre": n_nombre, "usuario": n_user, "password": n_pass, "rol_id": n_rol}).execute()
+                st.success("✅ Usuario creado con éxito.")
                 st.rerun()
     else: st.error("⛔ Acceso restringido.")

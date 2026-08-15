@@ -1,6 +1,6 @@
 from datetime import datetime
 import streamlit as st
-import streamlit.components.v1 as components
+from streamlit_autorefresh import st_autorefresh
 from supabase import create_client
 
 # ==========================================
@@ -8,17 +8,8 @@ from supabase import create_client
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
-# Refresco nativo cada 10 segundos mediante JavaScript embebido
-components.html(
-    """
-    <script>
-        setTimeout(function(){
-            window.parent.location.reload();
-        }, 10000);
-    </script>
-    """,
-    height=0,
-)
+# Autorrefresco cada 10 segundos (10000 milisegundos)
+st_autorefresh(interval=10000, key="datarefresh")
 
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
@@ -57,15 +48,18 @@ if not st.session_state["autenticado"]:
         elif not usuario_input:
             st.sidebar.warning("Por favor ingresa tu usuario.")
         else:
+            # Guardar estado de sesión
             st.session_state["autenticado"] = True
             st.session_state["usuario"] = usuario_input
             st.session_state["rol"] = rol_input
             st.rerun()
     st.stop()
 
+# Si ya está autenticado, recuperamos los valores de la sesión
 usuario = st.session_state["usuario"]
 rol_seleccionado = st.session_state["rol"]
 
+# Botón para cerrar sesión en el sidebar
 if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state["autenticado"] = False
     st.session_state["usuario"] = ""
@@ -74,6 +68,9 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
 
 ROLES_AUTORIZADOS_CREAR = ["Administrador", "Recepción", "Diseñador"]
 
+# ==========================================
+# MAPA DE PENDIENTES
+# ==========================================
 mapa_roles = {
     "Recepción": ["Creada / Pendiente de Diseño", "Enviado a Transferencia Térmica"],
     "Diseñador": ["Creada / Pendiente de Diseño"],
@@ -85,11 +82,15 @@ mapa_roles = {
 
 ordenes_db = supabase.table("ordenes").select("*").execute().data
 
+# Alerta sidebar
 if rol_seleccionado in mapa_roles:
     pendientes_sidebar = [o for o in ordenes_db if o["estado_actual"] in mapa_roles[rol_seleccionado] and (not "Producción" in rol_seleccionado or o["area_produccion"] in rol_seleccionado)]
     if pendientes_sidebar:
         st.sidebar.error(f"⚠️ Tienes {len(pendientes_sidebar)} órdenes pendientes.")
 
+# ==========================================
+# PANEL PRINCIPAL
+# ==========================================
 st.title("🧵 Pixel Thread - Gestión de Órdenes")
 busqueda = st.text_input("🔍 Buscador rápido (Número o Cliente)")
 
@@ -131,6 +132,7 @@ with tab1:
                                 else:
                                     st.warning("Escribe un motivo.")
 
+                # BOTONES DE CAMBIO DE ESTADO
                 estado = o["estado_actual"]
                 nuevo_estado = estado
 

@@ -244,33 +244,44 @@ with tabs[2]:
                         for col_idx, grupo in enumerate(grupos_tallas):
                             with grid_cols[col_idx]:
                                 for talla in grupo:
-                                    cantidad = tallas_del_color.get(talla, 0)
-                                    cant_str = f"{cantidad:02d}"
+                                    cantidad = int(tallas_del_color.get(talla, 0))
                                     
                                     if puede_modificar:
-                                        sub1, sub2, sub3 = st.columns([1.2, 1.5, 1])
+                                        sub1, sub2, sub3, sub4 = st.columns([1.1, 1.4, 0.9, 0.9])
                                         with sub1:
                                             st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #4ade80;'>{talla}</span></div>", unsafe_allow_html=True)
                                         with sub2:
-                                            st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #f3f4f6;'>{cant_str}</span></div>", unsafe_allow_html=True)
+                                            # Campo de texto numérico para escribir directamente con el teclado
+                                            nueva_cant = st.number_input(
+                                                f"Talla {talla}", 
+                                                min_value=0, 
+                                                step=1, 
+                                                value=cantidad, 
+                                                key=f"num_{item_id}_{color_sel}_{talla}", 
+                                                label_visibility="collapsed"
+                                            )
+                                            if nueva_cant != cantidad:
+                                                dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
+                                                supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                                st.rerun()
                                         with sub3:
                                             if st.button("➕", key=f"sum_{item_id}_{color_sel}_{talla}"):
                                                 dict_colores[color_sel]["tallas"][talla] = cantidad + 1
                                                 supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
                                                 st.rerun()
+                                        with sub4:
                                             if st.button("➖", key=f"res_{item_id}_{color_sel}_{talla}"):
                                                 if cantidad > 0:
                                                     dict_colores[color_sel]["tallas"][talla] = cantidad - 1
                                                     supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
                                                     st.rerun()
                                     else:
-                                        st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='color: #4ade80;'>{talla}</span>: <b>{cant_str}</b></div>", unsafe_allow_html=True)
+                                        st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='color: #4ade80;'>{talla}</span>: <b>{cantidad:02d}</b></div>", unsafe_allow_html=True)
                                     
                                     st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)
                 else:
                     st.warning("⚠️ Este producto no tiene formato de colores estructurado o contiene datos inválidos.")
 
-                # --- NUEVA OPCIÓN: Gestionar Colores / Imagen directamente en el producto ---
                 if puede_modificar:
                     with st.expander(f"🛠️ Gestionar Colores e Imagen de: {p_nombre}"):
                         st.markdown("#### 🖼️ Cambiar o Subir Imagen para el Color Actual (`" + color_sel + "`)")

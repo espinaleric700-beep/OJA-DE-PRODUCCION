@@ -148,10 +148,13 @@ def cargar_panel_principal():
                                 if st.button("Confirmar Cancelación", key=f"conf_cancel_{o['id']}"):
                                     if motivo:
                                         supabase.table("ordenes").update({"estado_actual": "Cancelado"}).eq("id", o["id"]).execute()
-                                        supabase.table("historial_ordenes").insert({
-                                            "orden_id": o["id"], "estado_anterior": o["estado_actual"], 
-                                            "estado_nuevo": "CANCELADO", "motivo": motivo, "cambiado_por": usuario
-                                        }).execute()
+                                        try:
+                                            supabase.table("historial_ordenes").insert({
+                                                "orden_id": o["id"], "estado_anterior": o["estado_actual"], 
+                                                "estado_nuevo": "CANCELADO", "motivo": motivo, "cambiado_por": usuario
+                                            }).execute()
+                                        except Exception as err:
+                                            st.error(f"Error al guardar historial: {err}")
                                         st.rerun()
                                     else:
                                         st.warning("Escribe un motivo.")
@@ -178,13 +181,14 @@ def cargar_panel_principal():
                     if nuevo_estado != estado:
                         supabase.table("ordenes").update({"estado_actual": nuevo_estado}).eq("id", o["id"]).execute()
                         try:
-                            # Registramos tanto los cambios normales como los estados finales (Entregado / Cancelado)
-                            estado_historial = "ENTREGADO" if nuevo_estado == "Entregado" else (nuevo_estado.upper() if nuevo_estado in ["Completado", "Cancelado"] else nuevo_estado)
                             supabase.table("historial_ordenes").insert({
-                                "orden_id": o["id"], "estado_anterior": estado, "estado_nuevo": estado_historial, "cambiado_por": usuario
+                                "orden_id": o["id"], 
+                                "estado_anterior": estado, 
+                                "estado_nuevo": nuevo_estado, 
+                                "cambiado_por": usuario
                             }).execute()
-                        except:
-                            pass
+                        except Exception as err:
+                            st.error(f"Error al registrar historial en Supabase: {err}")
                         st.rerun()
 
     with tab2:
@@ -300,8 +304,11 @@ def cargar_panel_principal():
             st.subheader("📊 Historial de Movimientos y Cancelaciones")
             try:
                 historial = supabase.table("historial_ordenes").select("*").execute().data
-                st.dataframe(historial)
-            except:
-                st.info("No hay registros en el historial.")
+                if historial:
+                    st.dataframe(historial)
+                else:
+                    st.info("No hay registros en el historial todavía.")
+            except Exception as e:
+                st.error(f"Error al cargar el historial: {e}")
 
 cargar_panel_principal()

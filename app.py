@@ -1,11 +1,15 @@
 from datetime import datetime
 import streamlit as st
 from supabase import create_client
+from streamlit_autorefresh import st_autorefresh
 
 # ==========================================
 # CONFIGURACIÓN Y ESTILO VISUAL (MODO OSCURO)
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
+
+# Actualización automática cada 10 segundos (10,000 milisegundos)
+st_autorefresh(interval=10000, key="auto_refresh_ordenes")
 
 # CSS personalizado para diseño profesional de fondo oscuro, tipografía nítida y estados a color
 st.markdown("""
@@ -30,7 +34,7 @@ st.markdown("""
         background-color: #111827;
         border: 1px solid #374151;
         border-radius: 10px;
-        padding: 20px;
+        padding: 10px;
     }
     
     /* Etiquetas y textos generales */
@@ -48,6 +52,7 @@ st.markdown("""
         padding: 0.5rem 1rem;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
         transition: all 0.3s ease;
+        width: 100%;
     }
     .stButton > button:hover {
         background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
@@ -114,10 +119,10 @@ st.title("🧵 Pixel Thread - Gestión")
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "⚙️ Usuarios"])
 
 # ------------------------------------------
-# TAB 0: VER Y FILTRAR ÓRDENES
+# TAB 0: VER Y FILTRAR ÓRDENES (Con selector rápido lateral y auto-refresco)
 # ------------------------------------------
 with tabs[0]:
-    st.subheader("📋 Listado y Control de Órdenes")
+    st.subheader("📋 Listado y Control de Órdenes (Actualización cada 10s)")
     try:
         ordenes = supabase.table("ordenes").select("*").execute().data
         lista_estados = ["Pendiente", "Enviado a Recepción", "En Producción", "Regresado a Recepción", "Orden Entregada"]
@@ -140,19 +145,34 @@ with tabs[0]:
                 }
                 icono_estado = color_map.get(estado_actual, "⚪")
                 
-                with st.expander(f"{icono_estado} Orden #{o.get('numero_orden', 'N/A')} - Cliente: {o.get('nombre_cliente', 'N/A')} | Estado: {estado_actual}"):
-                    st.write(f"**Área:** {o.get('area_produccion', 'N/A')} | **Detalles:** {o.get('nombre_orden', 'N/A')}")
-                    
-                    # Formulario para actualizar estado
-                    with st.form(f"form_update_{o.get('id')}"):
+                # Distribución en columnas: Izquierda detalles/expander, Derecha selector rápido
+                col_izq, col_der = st.columns([3, 1])
+                
+                with col_izq:
+                    with st.expander(f"{icono_estado} Orden #{o.get('numero_orden', 'N/A')} - Cliente: {o.get('nombre_cliente', 'N/A')} | Estado: {estado_actual}"):
+                        st.write(f"**Área:** {o.get('area_produccion', 'N/A')} | **Detalles:** {o.get('nombre_orden', 'N/A')}")
+                        
+                        if o.get('factura_url'):
+                            st.markdown(f"📄 [Ver Factura]({o.get('factura_url')})")
+
+                        with st.expander("🕒 Ver historial de cambios de estado"):
+                            historial_texto = o.get('historial')
+                            if historial_texto:
+                                st.markdown(historial_texto)
+                            else:
+                                st.info("No hay cambios registrados en el historial para esta orden.")
+
+                with col_der:
+                    with st.form(f"form_quick_{o.get('id')}"):
                         nuevo_estado = st.selectbox(
-                            f"Cambiar estado #{o.get('numero_orden')}", 
+                            "Cambiar", 
                             lista_estados, 
                             index=lista_estados.index(estado_actual) if estado_actual in lista_estados else 0, 
-                            key=f"sel_{o.get('id')}"
+                            key=f"sel_{o.get('id')}",
+                            label_visibility="collapsed"
                         )
                         
-                        if st.form_submit_button("💾 Actualizar y Registrar Cambio"):
+                        if st.form_submit_button("💾 Actualizar"):
                             fecha_hora_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                             usuario_actual = st.session_state['usuario']
                             
@@ -166,18 +186,8 @@ with tabs[0]:
                                 "historial": historial_actualizado
                             }).eq("id", o.get("id")).execute()
                             
-                            st.success("✅ Estado actualizado correctamente.")
+                            st.success("✅ Actualizado.")
                             st.rerun()
-
-                    if o.get('factura_url'):
-                        st.markdown(f"📄 [Ver Factura]({o.get('factura_url')})")
-
-                    with st.expander("🕒 Ver historial de cambios de estado"):
-                        historial_texto = o.get('historial')
-                        if historial_texto:
-                            st.markdown(historial_texto)
-                        else:
-                            st.info("No hay cambios registrados en el historial para esta orden.")
         else:
             st.info("No hay órdenes registradas.")
     except Exception as e:

@@ -51,7 +51,7 @@ lista_estados = [
 ]
 
 def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
-    path = f"ordenes/{datetime.now().strftime('%Y%m%d%H%M%S')}_{file_name}"
+    path = f"almacen/{datetime.now().strftime('%Y%m%d%H%M%S')}_{file_name}"
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
@@ -165,76 +165,94 @@ with tabs[1]:
 with tabs[2]:
     st.subheader("📦 Control de Inventario y Almacén")
     
-    # Verificar si el usuario tiene permiso para modificar/agregar/eliminar
     puede_modificar = st.session_state['rol'] in ["Administrador", "Recepción", "Almacén"]
 
     if puede_modificar:
         with st.expander("➕ Agregar Nuevo Producto al Inventario"):
             with st.form("form_nuevo_inventario", clear_on_submit=True):
-                inv_nombre = st.text_input("Nombre del Producto (Ej. Camiseta Ojo de Ángel)")
-                inv_size = st.text_input("Talla / Size (Ej. S, M, L, XL, Única)")
+                inv_nombre = st.text_input("Nombre de la Prenda (Ej. Camiseta Ojo de Ángel)")
+                inv_size = st.text_input("Talla / Size (Ej. S, M, L, XL, 2XL)")
                 inv_cantidad = st.number_input("Cantidad en Existencia", min_value=0, step=1)
+                foto_prenda = st.file_uploader("Foto de la Prenda", type=["png", "jpg", "jpeg"])
                 
                 if st.form_submit_button("Guardar en Inventario"):
                     try:
+                        foto_url = ""
+                        if foto_prenda:
+                            foto_url = subir_a_supabase(foto_prenda.getvalue(), foto_prenda.name)
+                        
                         supabase.table("almacen").insert({
                             "nombre_producto": inv_nombre,
                             "talla": inv_size,
-                            "cantidad": int(inv_cantidad)
+                            "cantidad": int(inv_cantidad),
+                            "imagen_url": foto_url
                         }).execute()
                         st.success("✅ Producto agregado al inventario correctamente.")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Error al guardar producto (asegúrate de tener creada la tabla 'almacen' en Supabase): {e}")
+                        st.error(f"Error al guardar producto: {e}")
         st.divider()
 
-    # Mostrar inventario existente
     try:
         inventario_db = supabase.table("almacen").select("*").execute().data
         if inventario_db:
-            st.markdown("### 📋 Existencias Actuales")
+            st.markdown("### 📋 Existencias Actuales en Almacén")
             for item in inventario_db:
                 item_id = item.get("id")
                 p_nombre = item.get("nombre_producto", "Sin nombre")
                 p_talla = item.get("talla", "N/A")
                 p_cantidad = item.get("cantidad", 0)
+                p_imagen = item.get("imagen_url", "")
 
-                if puede_modificar:
-                    with st.expander(f"📦 {p_nombre} | Talla: **{p_talla}** | Stock: **{p_cantidad}**"):
-                        with st.form(f"form_edit_inv_{item_id}"):
-                            edit_nombre = st.text_input("Nombre del Producto", value=p_nombre, key=f"inv_n_{item_id}")
-                            edit_talla = st.text_input("Talla / Size", value=p_talla, key=f"inv_t_{item_id}")
-                            edit_cant = st.number_input("Cantidad", value=int(p_cantidad), min_value=0, step=1, key=f"inv_c_{item_id}")
+                with st.container():
+                    st.markdown(f"### 🏷️ {p_nombre}")
+                    col_img, col_info = st.columns([1, 2])
+                    
+                    with col_img:
+                        if p_imagen:
+                            st.image(p_imagen, use_column_width=True)
+                        else:
+                            st.info("Sin foto disponible")
                             
-                            col_act, col_del = st.columns(2)
-                            btn_act = col_act.form_submit_button("💾 Guardar Cambios")
-                            btn_del = col_del.form_submit_button("🗑️ Eliminar Producto")
-                            
-                            if btn_act:
-                                try:
-                                    supabase.table("almacen").update({
-                                        "nombre_producto": edit_nombre,
-                                        "talla": edit_talla,
-                                        "cantidad": int(edit_cant)
-                                    }).eq("id", item_id).execute()
-                                    st.success("✅ Inventario actualizado.")
-                                    st.rerun()
-                                except Exception as ex:
-                                    st.error(f"Error al actualizar: {ex}")
+                    with col_info:
+                        st.markdown(f"**Talla / Size:** `{p_talla}`")
+                        st.markdown(f"**Cantidad en Existencia:** **{p_cantidad} unidades**")
+                        
+                        if puede_modificar:
+                            with st.expander("🛠️ Modificar o Eliminar este producto"):
+                                with st.form(f"form_edit_inv_{item_id}"):
+                                    edit_nombre = st.text_input("Nombre de la Prenda", value=p_nombre, key=f"inv_n_{item_id}")
+                                    edit_talla = st.text_input("Talla / Size", value=p_talla, key=f"inv_t_{item_id}")
+                                    edit_cant = st.number_input("Cantidad", value=int(p_cantidad), min_value=0, step=1, key=f"inv_c_{item_id}")
                                     
-                            if btn_del:
-                                try:
-                                    supabase.table("almacen").delete().eq("id", item_id).execute()
-                                    st.warning("⚠️ Producto eliminado del inventario.")
-                                    st.rerun()
-                                except Exception as ex:
-                                    st.error(f"Error al eliminar: {ex}")
-                else:
-                    st.info(f"📦 **{p_nombre}** — Talla: `{p_talla}` — Cantidad en Existencia: **{p_cantidad}**")
+                                    col_act, col_del = st.columns(2)
+                                    btn_act = col_act.form_submit_button("💾 Guardar Cambios")
+                                    btn_del = col_del.form_submit_button("🗑️ Eliminar Producto")
+                                    
+                                    if btn_act:
+                                        try:
+                                            supabase.table("almacen").update({
+                                                "nombre_producto": edit_nombre,
+                                                "talla": edit_talla,
+                                                "cantidad": int(edit_cant)
+                                            }).eq("id", item_id).execute()
+                                            st.success("✅ Inventario actualizado.")
+                                            st.rerun()
+                                        except Exception as ex:
+                                            st.error(f"Error al actualizar: {ex}")
+                                            
+                                    if btn_del:
+                                        try:
+                                            supabase.table("almacen").delete().eq("id", item_id).execute()
+                                            st.warning("⚠️ Producto eliminado del inventario.")
+                                            st.rerun()
+                                        except Exception as ex:
+                                            st.error(f"Error al eliminar: {ex}")
+                    st.divider()
         else:
             st.info("No hay productos registrados en el almacén.")
     except Exception as e:
-        st.error(f"Nota: Si es la primera vez que usas esta sección, recuerda crear la tabla 'almacen' en Supabase con columnas: id, nombre_producto, talla, cantidad. Error: {e}")
+        st.error(f"Error al cargar el almacén: {e}")
 
 # ------------------------------------------
 # TAB 3: GESTIÓN DE USUARIOS (ADMIN)

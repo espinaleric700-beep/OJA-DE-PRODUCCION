@@ -42,17 +42,18 @@ st.markdown("""
         color: #e5e7eb;
     }
     
-    /* Botones principales llamativos */
+    /* Botones principales llamativos y compactos para el selector rápido */
     .stButton > button {
         background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
         color: white;
         border-radius: 8px;
         border: none;
         font-weight: 600;
-        padding: 0.5rem 1rem;
+        padding: 0.35rem 0.75rem;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
         transition: all 0.3s ease;
         width: 100%;
+        min-height: 2.2rem;
     }
     .stButton > button:hover {
         background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
@@ -119,7 +120,7 @@ st.title("🧵 Pixel Thread - Gestión")
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "⚙️ Usuarios"])
 
 # ------------------------------------------
-# TAB 0: VER Y FILTRAR ÓRDENES (Con selector rápido lateral y auto-refresco)
+# TAB 0: VER Y FILTRAR ÓRDENES
 # ------------------------------------------
 with tabs[0]:
     st.subheader("📋 Listado y Control de Órdenes (Actualización cada 10s)")
@@ -135,7 +136,6 @@ with tabs[0]:
             for o in ordenes_a_mostrar:
                 estado_actual = o.get('estado') or o.get('estado_actual') or 'Pendiente'
                 
-                # Asignación de colores distintivos según el estado de la orden
                 color_map = {
                     "Pendiente": "🟡",
                     "Enviado a Recepción": "🔵",
@@ -145,7 +145,6 @@ with tabs[0]:
                 }
                 icono_estado = color_map.get(estado_actual, "⚪")
                 
-                # Distribución en columnas: Izquierda detalles/expander, Derecha selector rápido
                 col_izq, col_der = st.columns([3, 1])
                 
                 with col_izq:
@@ -172,7 +171,8 @@ with tabs[0]:
                             label_visibility="collapsed"
                         )
                         
-                        if st.form_submit_button("💾 Actualizar"):
+                        # Botón optimizado, estilizado y compacto sin icono innecesario
+                        if st.form_submit_button("Actualizar"):
                             fecha_hora_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                             usuario_actual = st.session_state['usuario']
                             

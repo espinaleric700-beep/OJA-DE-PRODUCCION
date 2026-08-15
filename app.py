@@ -97,7 +97,11 @@ busqueda = st.text_input(
 
 # Pestañas de Navegación
 tab1, tab2, tab3 = st.tabs(
-    ["📋 Ver Órdenes", "➕ Nueva Orden", "⚙️ Configuración / Reportes"]
+    [
+        "📋 Ver Órdenes",
+        "➕ Nueva Orden",
+        "⚙️ Configuración / Reportes / Usuarios",
+    ]
 )
 
 with tab1:
@@ -239,7 +243,9 @@ with tab2:
             "tbf",
         ],
     )
-    recibo_subido = st.file_uploader("Subir Recibo de Pago", type=["jpg", "png", "pdf"])
+    recibo_subido = st.file_uploader(
+        "Subir Recibo de Pago", type=["jpg", "png", "pdf"]
+    )
 
     submit = st.form_submit_button("Crear Orden")
 
@@ -283,7 +289,48 @@ with tab2:
         st.error("Por favor completa los campos obligatorios.")
 
 with tab3:
-  st.subheader("Auditoría e Historial de Cambios")
+  st.subheader("👥 Gestión de Usuarios y Roles")
+
+  if rol_seleccionado != "Administrador":
+    st.warning(
+        "Solo el Administrador puede registrar nuevos usuarios y asignar"
+        " roles."
+    )
+  else:
+    with st.form("form_nuevo_usuario"):
+      nuevo_nombre = st.text_input("Nombre Completo del Empleado")
+      nuevo_usuario = st.text_input("Nombre de Usuario (Login)")
+      nuevo_password = st.text_input(
+          "Contraseña", type="password"
+      )
+      nuevo_rol = st.selectbox("Asignar Rol", roles_disponibles)
+
+      submit_usuario = st.form_submit_button("Registrar Usuario")
+
+      if submit_usuario:
+        if nuevo_nombre and nuevo_usuario and nuevo_password:
+          try:
+            # Insertar usuario en la tabla usuarios de Supabase
+            supabase.table("usuarios").insert({
+                "nombre": nuevo_nombre,
+                "usuario": nuevo_usuario,
+                "password": nuevo_password,
+                "rol_id": roles_disponibles.index(nuevo_rol)
+                + 1,  # Asumiendo relación por índice o ID
+            }).execute()
+            st.success(
+                f"¡Usuario '{nuevo_usuario}' registrado con rol '{nuevo_rol}'"
+                " con éxito!"
+            )
+          except Exception as e:
+            st.error(
+                f"Error al registrar usuario (puede que ya exista): {e}"
+            )
+        else:
+          st.error("Por favor completa todos los campos del usuario.")
+
+  st.divider()
+  st.subheader("📋 Auditoría e Historial de Cambios")
   historial = (
       supabase.table("historial_ordenes")
       .select("*")

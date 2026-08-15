@@ -52,6 +52,8 @@ if "autenticado" not in st.session_state:
     st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 if "colores_inventario_avanzado" not in st.session_state:
     st.session_state["colores_inventario_avanzado"] = {}
+if "items_orden_actual" not in st.session_state:
+    st.session_state["items_orden_actual"] = []
 
 # --- Autenticación ---
 st.sidebar.title("🔐 Control de Acceso")
@@ -79,31 +81,97 @@ tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "📦 Almacén", "⚙️
 
 # --- Tabs ---
 with tabs[0]:
-    ordenes = supabase.table("ordenes").select("*").execute().data
-    for o in ordenes:
-        with st.expander(f"Orden #{o.get('numero_orden')} - {o.get('nombre_cliente')}"):
-            st.write(f"Estado: {o.get('estado')}")
+    st.subheader("📋 Listado de Órdenes")
+    
+    # Filtro por estado
+    filtro_estado = st.selectbox("Filtrar por Estado", ["Todos"] + lista_estados, key="filtro_estado_ordenes")
+    
+    try:
+        query_ordenes = supabase.table("ordenes").select("*")
+        if filtro_estado != "Todos":
+            query_ordenes = query_ordenes.eq("estado", filtro_estado)
+        
+        ordenes = query_ordenes.execute().data
+        
+        if ordenes:
+            for o in ordenes:
+                o_id = o.get("id")
+                numero_o = o.get('numero_orden', 'S/N')
+                cliente_o = o.get('nombre_cliente', 'Sin cliente')
+                estado_actual = o.get('estado', 'Pendiente')
+                
+                with st.expander(f"Orden #{numero_o} - {cliente_o} [Estado: {estado_actual}]"):
+                    col_info1, col_info2 = st.columns(2)
+                    with col_info1:
+                        st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
+                        st.write(f"**Fecha de Entrega:** {o.get('fecha_entrega', 'N/D')}")
+                        st.write(f"**Tipo de Servicio:** {o.get('tipo_servicio', 'N/D')}")
+                    with col_info2:
+                        st.write(f"**Total:** ${o.get('total', 0)}")
+                        st.write(f"**Abono:** ${o.get('abono', 0)}")
+                        st.write(f"**Restante:** ${o.get('restante', 0)}")
+                    
+                    st.markdown("---")
+                    nuevo_estado_sel = st.selectbox("Cambiar Estado de la Orden", lista_estados, index=lista_estados.index(estado_actual) if estado_actual in lista_estados else 0, key=f"select_est_{o_id}")
+                    
+                    if nuevo_estado_sel != estado_actual:
+                        if st.button("💾 Actualizar Estado", key=f"btn_upd_est_{o_id}"):
+                            supabase.table("ordenes").update({"estado": nuevo_estado_sel}).eq("id", o_id).execute()
+                            st.success("✅ ¡Estado actualizado!")
+                            st.rerun()
+        else:
+            st.info("No hay órdenes registradas con este filtro.")
+    except Exception as e:
+        st.error(f"Error al cargar las órdenes: {e}")
 
 with tabs[1]:
     st.subheader("➕ Crear Nueva Orden")
-    with st.form("form_nueva_orden"):
-        nombre_cliente = st.text_input("Nombre del Cliente")
-        numero_orden = st.text_input("Número de Orden")
-        submit_orden = st.form_submit_button("Guardar Orden")
-        if submit_orden:
-            if nombre_cliente and numero_orden:
+    
+    with st.form("form_crear_orden_completa"):
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            numero_orden = st.text_input("Número de Orden")
+            nombre_cliente = st.text_input("Nombre del Cliente")
+            telefono_cliente = st.text_input("Teléfono del Cliente")
+        with col_c2:
+            tipo_servicio = st.selectbox("Tipo de Servicio", ["Bordado", "DTF", "Sublimación", "Mixto"])
+            fecha_entrega = st.date_input("Fecha Estimada de Entrega")
+            
+        st.markdown("---")
+        st.markdown("💰 **Información de Pago**")
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1:
+            total_orden = st.number_input("Total ($)", min_value=0.0, step=100.0)
+        with col_p2:
+            abono_orden = st.number_input("Abono / Anticipo ($)", min_value=0.0, step=100.0)
+        with col_p3:
+            restante_calc = total_orden - abono_orden
+            st.number_input("Restante ($)", value=max(0.0, restante_calc), disabled=True)
+            
+        observaciones = st.text_area("Observaciones o Detalles de la Orden")
+        
+        submit_nueva_orden = st.form_submit_button("💾 Guardar Orden Definitiva")
+        if submit_nueva_orden:
+            if numero_orden.strip() and nombre_cliente.strip():
                 try:
                     supabase.table("ordenes").insert({
                         "numero_orden": numero_orden,
                         "nombre_cliente": nombre_cliente,
+                        "telefono": telefono_cliente,
+                        "tipo_servicio": tipo_servicio,
+                        "fecha_entrega": str(fecha_entrega),
+                        "total": total_orden,
+                        "abono": abono_orden,
+                        "restante": max(0.0, restante_calc),
+                        "observaciones": observaciones,
                         "estado": "Pendiente"
                     }).execute()
-                    st.success("✅ ¡Orden creada con éxito!")
+                    st.success("✅ ¡Orden creada y guardada correctamente!")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error al guardar orden: {e}")
+                    st.error(f"Error al guardar la orden: {e}")
             else:
-                st.warning("Completa los campos obligatorios.")
+                st.warning("⚠️ Debes llenar al menos el número de orden y el nombre del cliente.")
 
 with tabs[2]:
     st.subheader("📦 Control de Inventario")

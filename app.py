@@ -287,46 +287,54 @@ with tabs[2]:
                             st.session_state[key_activo] = lista_cols[0]
 
                         st.markdown("Colores")
-
-                        # Ancla para localizar exactamente la fila de botones de este producto
                         st.markdown(f'<div id="anchor_colores_{item_id}"></div>', unsafe_allow_html=True)
 
-                        css_colores = "<style>\n"
-                        for idx_c, c_name in enumerate(lista_cols):
-                            c_hex = dict_colores[c_name].get("hex", "#3b82f6")
-                            txt_color = obtener_color_texto(c_hex)
-                            es_seleccionado = (st.session_state[key_activo] == c_name)
-                            
-                            borde = "3px solid #ffffff" if es_seleccionado else "1px solid rgba(255, 255, 255, 0.2)"
-                            box_shadow = f"0 0 10px {c_hex}" if es_seleccionado else "none"
-                            
-                            css_colores += f"""
-                            div:has(#anchor_colores_{item_id}) + div[data-testid="stHorizontalBlock"] > div:nth-child({idx_c + 1}) button {{
-                                background: {c_hex} !important;
-                                color: {txt_color} !important;
-                                border: {borde} !important;
-                                box-shadow: {box_shadow} !important;
-                                font-weight: 800 !important;
-                                font-size: 0.9rem !important;
-                                text-transform: uppercase !important;
-                                border-radius: 6px !important;
-                                min-height: 2.2rem !important;
-                                transition: all 0.2s ease-in-out !important;
-                            }}
-                            div:has(#anchor_colores_{item_id}) + div[data-testid="stHorizontalBlock"] > div:nth-child({idx_c + 1}) button:hover {{
-                                opacity: 0.9 !important;
-                                transform: scale(1.02) !important;
-                            }}
-                            """
-                        css_colores += "</style>"
-                        st.markdown(css_colores, unsafe_allow_html=True)
-
                         cols_botones = st.columns(len(lista_cols))
+                        mapa_botones_js = {}
+                        
                         for i, c_name in enumerate(lista_cols):
+                            c_hex = dict_colores[c_name].get("hex", "#3b82f6")
+                            txt_col = obtener_color_texto(c_hex)
+                            es_sel = (st.session_state[key_activo] == c_name)
+                            
+                            mapa_botones_js[f"btn_col_{item_id}_{i}"] = {
+                                "bg": c_hex,
+                                "color": txt_col,
+                                "border": "3px solid #ffffff" if es_sel else "1px solid rgba(255, 255, 255, 0.3)",
+                                "shadow": f"0 0 10px {c_hex}" if es_sel else "none"
+                            }
+                            
                             with cols_botones[i]:
                                 if st.button(c_name, key=f"btn_col_{item_id}_{i}", use_container_width=True):
                                     st.session_state[key_activo] = c_name
                                     st.rerun()
+
+                        # Inyección directa mediante JavaScript para forzar los estilos reales en los botones
+                        js_code = f"""
+                        <script>
+                        const config_{item_id} = {json.dumps(mapa_botones_js)};
+                        const anchor_{item_id} = document.getElementById("anchor_colores_{item_id}");
+                        if (anchor_{item_id}) {{
+                            const parentBlock_{item_id} = anchor_{item_id}.nextElementSibling;
+                            if (parentBlock_{item_id} && parentBlock_{item_id}.getAttribute('data-testid') === 'stHorizontalBlock') {{
+                                const cols = parentBlock_{item_id}.children;
+                                Object.keys(config_{item_id}).forEach((key, index) => {{
+                                    if (cols[index]) {{
+                                        const btn = cols[index].querySelector('button');
+                                        if (btn) {{
+                                            btn.style.backgroundColor = config_{item_id}[key].bg;
+                                            btn.style.color = config_{item_id}[key].color;
+                                            btn.style.border = config_{item_id}[key].border;
+                                            btn.style.boxShadow = config_{item_id}[key].shadow;
+                                            btn.style.fontWeight = "bold";
+                                        }}
+                                    }}
+                                }});
+                            }}
+                        }}
+                        </script>
+                        """
+                        st.markdown(js_code, unsafe_allow_html=True)
 
                         color_seleccionado_ver = st.session_state[key_activo]
                         st.markdown("<br>", unsafe_allow_html=True)

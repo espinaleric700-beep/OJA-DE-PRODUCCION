@@ -18,7 +18,7 @@ st.markdown("""
     div.streamlit-expanderHeader { background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; color: #f9fafb; font-weight: 600; }
     div[data-testid="stForm"] { background-color: #111827; border: 1px solid #374151; border-radius: 10px; padding: 10px; }
     p, label, span, div { color: #e5e7eb; }
-    .stButton > button { border-radius: 6px; border: none; font-weight: 600; padding: 0.2rem 0.4rem; min-height: 1.8rem; }
+    .stButton > button { border-radius: 4px; border: none; font-weight: 600; padding: 0.1rem 0.3rem; min-height: 1.5rem; font-size: 0.8rem; }
     [data-testid="stSidebar"] { background-color: #030712; border-right: 1px solid #1f2937; }
     </style>
 """, unsafe_allow_html=True)
@@ -199,8 +199,6 @@ with tabs[2]:
                         st.session_state[key_activo] = lista_cols[0]
                     
                     st.markdown("Colores")
-                    
-                    # Botones de colores distribuidos ordenadamente
                     cols_colores = st.columns(min(len(lista_cols), 4))
                     for idx, c_name in enumerate(lista_cols):
                         with cols_colores[idx % len(cols_colores)]:
@@ -224,33 +222,41 @@ with tabs[2]:
                         st.markdown(f"**Existencias para el color: `{color_sel}`**")
                         tallas_del_color = data_color.get("tallas", {})
                         
-                        # Organización de tallas en 3 columnas con botones ➖ / ➕
-                        cols_por_fila = 3
-                        tallas_items = [(t, tallas_del_color.get(t, 0)) for t in tallas_disponibles]
+                        # --- DISTRIBUCIÓN EXACTA EN 3 COLUMNAS VERTICALES (Estilo de tu imagen) ---
+                        columna_1 = ["2", "4", "6", "8", "10"]
+                        columna_2 = ["12", "14", "16", "S", "M"]
+                        columna_3 = ["WS", "WM", "L", "XL", "2XL"]
                         
-                        for i in range(0, len(tallas_items), cols_por_fila):
-                            fila_cols = st.columns(cols_por_fila)
-                            for j in range(cols_por_fila):
-                                if i + j < len(tallas_items):
-                                    talla, cantidad = tallas_items[i + j]
-                                    with fila_cols[j]:
-                                        if puede_modificar:
-                                            sub_c_btn1, sub_c_txt, sub_c_btn2 = st.columns([0.6, 2, 0.6], gap="small")
-                                            with sub_c_btn1:
-                                                if st.button("➖", key=f"m_av_{item_id}_{color_sel}_{talla}"):
-                                                    if cantidad > 0:
-                                                        dict_colores[color_sel]["tallas"][talla] = cantidad - 1
-                                                        supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                                                        st.rerun()
-                                            with sub_c_txt:
-                                                st.markdown(f"<div style='background-color: #111827; padding: 4px 2px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.8em; font-weight: bold;'>{talla}</span><br><span style='font-size: 0.85em; color: #60a5fa;'>{cantidad}</span></div>", unsafe_allow_html=True)
-                                            with sub_c_btn2:
-                                                if st.button("➕", key=f"p_av_{item_id}_{color_sel}_{talla}"):
-                                                    dict_colores[color_sel]["tallas"][talla] = cantidad + 1
+                        grid_cols = st.columns(3)
+                        grupos_tallas = [columna_1, columna_2, columna_3]
+                        
+                        for col_idx, grupo in enumerate(grupos_tallas):
+                            with grid_cols[col_idx]:
+                                for talla in grupo:
+                                    cantidad = tallas_del_color.get(talla, 0)
+                                    cant_str = f"{cantidad:02d}"  # Formato de dos dígitos ej. '00', '05'
+                                    
+                                    if puede_modificar:
+                                        sub1, sub2, sub3 = st.columns([1.2, 1.5, 1])
+                                        with sub1:
+                                            st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #4ade80;'>{talla}</span></div>", unsafe_allow_html=True)
+                                        with sub2:
+                                            st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #f3f4f6;'>{cant_str}</span></div>", unsafe_allow_html=True)
+                                        with sub3:
+                                            # Botones apilados verticalmente para +/-
+                                            if st.button("➕", key=f"p_{item_id}_{color_sel}_{talla}"):
+                                                dict_colores[color_sel]["tallas"][talla] = cantidad + 1
+                                                supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                                st.rerun()
+                                            if st.button("➖", key=f"m_{item_id}_{color_sel}_{talla}"):
+                                                if cantidad > 0:
+                                                    dict_colores[color_sel]["tallas"][talla] = cantidad - 1
                                                     supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
                                                     st.rerun()
-                                        else:
-                                            st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 6px; border: 1px solid #1f2937; text-align: center;'><b>{talla}</b><br><span style='color: #60a5fa;'>{cantidad}</span></div>", unsafe_allow_html=True)
+                                    else:
+                                        st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='color: #4ade80;'>{talla}</span>: <b>{cant_str}</b></div>", unsafe_allow_html=True)
+                                    
+                                    st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)
                 else:
                     st.warning("⚠️ Este producto no tiene formato de colores estructurado o contiene datos inválidos.")
 

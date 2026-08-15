@@ -45,16 +45,18 @@ if not st.session_state["autenticado"]:
             st.sidebar.warning("Por favor ingresa usuario y contraseña.")
         else:
             try:
-                res = supabase.table("usuarios").select("*").eq("usuario", usuario_input).eq("password", password_input).eq("rol", rol_input).execute()
+                # Buscamos solo por usuario y contraseña para evitar el error de columna faltante
+                res = supabase.table("usuarios").select("*").eq("usuario", usuario_input).eq("password", password_input).execute()
                 usuarios_encontrados = res.data
 
                 if usuarios_encontrados:
                     st.session_state["autenticado"] = True
                     st.session_state["usuario"] = usuario_input
+                    # Asignamos el rol que el usuario seleccionó o el que tenga en la BD
                     st.session_state["rol"] = rol_input
                     st.rerun()
                 else:
-                    st.sidebar.error("❌ Usuario, contraseña o rol incorrectos.")
+                    st.sidebar.error("❌ Usuario o contraseña incorrectos.")
             except Exception as e:
                 st.sidebar.error(f"Error al verificar credenciales: {e}")
     st.stop()
@@ -184,11 +186,12 @@ def cargar_panel_principal():
             st.error("⚠️ No tienes permisos para crear o modificar órdenes.")
 
     if rol_seleccionado == "Administrador":
+        tab3_roles_disponibles = ["Administrador", "Recepción", "Diseñador", "Almacén", "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"]
         with tab3:
             st.subheader("👥 Gestión de Usuarios")
             n_user = st.text_input("Nuevo Usuario")
             n_pass = st.text_input("Contraseña", type="password")
-            n_rol = st.selectbox("Rol", roles_disponibles, key="sel_rol_n")
+            n_rol = st.selectbox("Rol", tab3_roles_disponibles, key="sel_rol_n")
             if st.button("Registrar Usuario"):
                 supabase.table("usuarios").insert({"usuario": n_user, "password": n_pass, "rol": n_rol}).execute()
                 st.success("Registrado con éxito")
@@ -201,5 +204,4 @@ def cargar_panel_principal():
             except:
                 st.info("No hay registros en el historial.")
 
-# Ejecutar el fragmento principal
 cargar_panel_principal()

@@ -16,28 +16,11 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
-# Roles por defecto
-roles_por_defecto = [
-    "Administrador", "Recepción", "Diseñador", "Almacén", 
-    "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"
-]
-
-roles_disponibles = roles_por_defecto
-try:
-    res_roles = supabase.table("rol").select("id").execute()
-    if res_roles.data:
-        roles_db = [r.get("id") for r in res_roles.data if r.get("id")]
-        roles_disponibles = list(set(roles_por_defecto + roles_db))
-except Exception:
-    pass
-
 # ==========================================
-# GESTIÓN DE SESIÓN Y AUTENTICACIÓN
+# GESTIÓN DE SESIÓN
 # ==========================================
 if "autenticado" not in st.session_state:
-    st.session_state["autenticado"] = False
-    st.session_state["usuario"] = ""
-    st.session_state["rol"] = ""
+    st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 
 st.sidebar.title("🔐 Control de Acceso")
 
@@ -46,253 +29,99 @@ if not st.session_state["autenticado"]:
     password_input = st.sidebar.text_input("Contraseña", type="password")
     
     if st.sidebar.button("Iniciar Sesión"):
-        if not usuario_input or not password_input:
-            st.sidebar.warning("Por favor ingresa usuario y contraseña.")
-        elif usuario_input.strip().lower() == "admin" and password_input == "2580Admin":
-            st.session_state["autenticado"] = True
-            st.session_state["usuario"] = "admin"
-            st.session_state["rol"] = "Administrador"
+        if usuario_input.strip().lower() == "admin" and password_input == "2580Admin":
+            st.session_state.update({"autenticado": True, "usuario": "admin", "rol": "Administrador"})
             st.rerun()
         else:
             try:
                 res = supabase.table("usuarios").select("*").execute()
-                usuario_encontrado = None
-                for u in res.data:
-                    if str(u.get("usuario") or "").lower() == usuario_input.strip().lower() and str(u.get("password") or "") == str(password_input):
-                        usuario_encontrado = u
-                        break
-                
+                usuario_encontrado = next((u for u in res.data if u["usuario"].lower() == usuario_input.lower() and u["password"] == password_input), None)
                 if usuario_encontrado:
-                    st.session_state["autenticado"] = True
-                    st.session_state["usuario"] = usuario_input
-                    st.session_state["rol"] = usuario_encontrado.get("rol_id", "")
+                    st.session_state.update({"autenticado": True, "usuario": usuario_input, "rol": usuario_encontrado.get("rol_id", "")})
                     st.rerun()
                 else:
                     st.sidebar.error("❌ Usuario o contraseña incorrectos.")
             except Exception as e:
-                st.sidebar.error(f"Error de conexión: {e}")
+                st.sidebar.error(f"Error: {e}")
     st.stop()
 
 # ==========================================
 # PANEL PRINCIPAL
 # ==========================================
 st.sidebar.button("🚪 Cerrar Sesión", on_click=lambda: st.session_state.update({"autenticado": False}))
-st.sidebar.info(f"👤 Conectado como: **{st.session_state['usuario']}**\n\n🛡️ Rol: **{st.session_state['rol']}**")
+st.sidebar.info(f"👤 Usuario: **{st.session_state['usuario']}** | Rol: **{st.session_state['rol']}**")
 
 st.title("🧵 Pixel Thread - Gestión")
-
-tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "⚙️ Configuración / Usuarios"])
-
-rol_actual = str(st.session_state.get("rol", "")).strip()
-rol_lower = rol_actual.lower()
+tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "⚙️ Usuarios"])
 
 # ------------------------------------------
-# TAB 0: VER ÓRDENES Y FLUJO DE ESTADOS
+# TAB 0: VER Y ACTUALIZAR ÓRDENES
 # ------------------------------------------
 with tabs[0]:
     st.subheader("📋 Listado y Control de Órdenes")
     try:
         ordenes = supabase.table("ordenes").select("*").execute().data
-        if ordenes:
-            for o in ordenes:
-                area_orden = o.get('area_produccion', 'General')
-                # Soportar tanto 'estado' como 'estado_actual' por compatibilidad
-                estado_actual = o.get('estado') or o.get('estado_actual') or 'Pendiente'
-                num_orden = o.get('numero_orden', 'N/A')
-                cliente = o.get('nombre_cliente', 'General')
-                nombre_ord = o.get('nombre_orden', 'Sin detalles')
+        lista_estados = ["Pendiente", "Enviado a Recepción", "En Producción", "Regresado a Recepción", "Orden Entregada"]
+        
+        for o in ordenes:
+            estado_actual = o.get('estado') or o.get('estado_actual') or 'Pendiente'
+            
+            with st.expander(f"Orden #{o.get('numero_orden', 'N/A')} - Cliente: {o.get('nombre_cliente', 'N/A')}"):
+                st.write(f"**Área:** {o.get('area_produccion', 'N/A')} | **Detalles:** {o.get('nombre_orden', 'N/A')}")
                 
-                with st.expander(f"Orden #{num_orden} - Cliente: {cliente} | Área: [{area_orden}] - Estado: {estado_actual}"):
-                    st.write(f"**Área de Producción:** {area_orden}")
-                    st.write(f"**Nombre/Detalles de la Orden:** {nombre_ord}")
-                    st.write(f"📌 **Estado Actual:** {estado_actual}")
-                    
-                    # 1. Rol Diseñador: Puede enviar a recepción
-                    if rol_lower == "diseñador" and estado_actual == "Pendiente":
-                        if st.button("📤 Enviar a Recepción", key=f"btn_dis_{o.get('id')}"):
-                            try:
-                                supabase.table("ordenes").update({
-                                    "estado": "Enviado a Recepción",
-                                    "estado_actual": "Enviado a Recepción"
-                                }).eq("id", o.get("id")).execute()
-                                st.success("✅ Orden enviada a recepción.")
-                                st.rerun()
-                            except Exception as ex:
-                                st.error(f"Error: {ex}")
+                # Selector de estado libre para cualquier usuario
+                idx_actual = lista_estados.index(estado_actual) if estado_actual in lista_estados else 0
+                nuevo_estado = st.selectbox(f"Estado Orden {o.get('numero_orden')}", lista_estados, index=idx_actual, key=f"sel_{o.get('id')}")
+                
+                if st.button("💾 Actualizar Estado", key=f"btn_{o.get('id')}"):
+                    supabase.table("ordenes").update({"estado": nuevo_estado, "estado_actual": nuevo_estado}).eq("id", o.get("id")).execute()
+                    st.rerun()
 
-                    # 2. Roles de Producción y Almacén
-                    es_produccion_area = (rol_lower == "producción - bordados" and area_orden == "Bordados") or \
-                                         (rol_lower == "producción - impresión" and area_orden == "Impresion")
-                    es_almacen = rol_lower in ["almacén", "almacen"]
-
-                    if es_produccion_area or es_almacen:
-                        if estado_actual in ["Enviado a Recepción", "Pendiente"]:
-                            if st.button("🚀 Enviar a Producción", key=f"btn_prod_{o.get('id')}"):
-                                try:
-                                    supabase.table("ordenes").update({
-                                        "estado": "En Producción",
-                                        "estado_actual": "En Producción"
-                                    }).eq("id", o.get("id")).execute()
-                                    st.success("✅ Orden enviada a producción.")
-                                    st.rerun()
-                                except Exception as ex:
-                                    st.error(f"Error: {ex}")
-
-                        if estado_actual == "En Producción":
-                            if es_almacen and st.button("✔️ Marcar Listo (Almacén)", key=f"btn_alm_{o.get('id')}"):
-                                try:
-                                    supabase.table("ordenes").update({
-                                        "estado": "Regresado a Recepción",
-                                        "estado_actual": "Regresado a Recepción"
-                                    }).eq("id", o.get("id")).execute()
-                                    st.success("✅ Almacén actualizado. Orden devuelta a Recepción.")
-                                    st.rerun()
-                                except Exception as ex:
-                                    st.error(f"Error: {ex}")
-
-                            if es_produccion_area and st.button("🏁 Marcar Completado (Producción)", key=f"btn_comp_{o.get('id')}"):
-                                try:
-                                    supabase.table("ordenes").update({
-                                        "estado": "Regresado a Recepción",
-                                        "estado_actual": "Regresado a Recepción"
-                                    }).eq("id", o.get("id")).execute()
-                                    st.success("✅ Producción completada. Orden devuelta a Recepción.")
-                                    st.rerun()
-                                except Exception as ex:
-                                    st.error(f"Error: {ex}")
-
-                    # 3. Rol Recepción o Administrador: Subir factura y entregar orden
-                    es_recepcion = rol_lower in ["recepción", "recepcion"]
-                    es_admin = rol_lower == "administrador"
-
-                    if (es_recepcion or es_admin) and estado_actual in ["Regresado a Recepción", "Enviado a Recepción", "Pendiente"]:
-                        st.markdown("---")
-                        st.subheader("🧾 Gestión de Factura y Entrega")
-                        factura_archivo = st.file_uploader("Subir Factura", type=["pdf", "png", "jpg", "jpeg"], key=f"fact_{o.get('id')}")
-                        
-                        if st.button("✅ Marcar Orden Entregada y Guardar Factura", key=f"btn_entregado_{o.get('id')}"):
-                            try:
-                                factura_url = o.get("factura_url", "")
-                                if factura_archivo:
-                                    factura_url = subir_a_supabase(factura_archivo.getvalue(), factura_archivo.name, bucket="disenos")
-                                
-                                supabase.table("ordenes").update({
-                                    "estado": "Orden Entregada",
-                                    "estado_actual": "Orden Entregada",
-                                    "factura_url": factura_url
-                                }).eq("id", o.get("id")).execute()
-                                st.success("🎉 ¡Orden marcada como entregada con éxito!")
-                                st.rerun()
-                            except Exception as ex:
-                                st.error(f"Error al procesar la entrega: {ex}")
-
-                    if o.get('factura_url'):
-                        st.markdown(f"📄 [Ver Factura Adjunta]({o.get('factura_url')})")
-
-                    # Archivos adjuntos
-                    imagenes = o.get('imagen_url')
-                    if imagenes:
-                        if isinstance(imagenes, str):
-                            lista_archivos = [arch.strip() for arch in imagenes.split(",") if arch.strip()]
-                        else:
-                            lista_archivos = imagenes
-                        
-                        st.write("**Archivos y Diseños Adjuntos:**")
-                        for idx, archivo_url in enumerate(lista_archivos):
-                            nombre_archivo = archivo_url.split("/")[-1]
-                            if archivo_url.lower().endswith(('.png', '.jpg', '.jpeg', '.svg')):
-                                st.image(archivo_url, width=200, caption=nombre_archivo)
-                            else:
-                                st.markdown(f"📥 [Descargar archivo {idx+1}: {nombre_archivo}]({archivo_url})")
-        else:
-            st.info("No hay órdenes registradas.")
+                if o.get('factura_url'):
+                    st.markdown(f"📄 [Ver Factura]({o.get('factura_url')})")
     except Exception as e:
-        st.error(f"Error al cargar las órdenes: {e}")
+        st.error(f"Error al cargar: {e}")
 
 # ------------------------------------------
-# TAB 1: NUEVA ORDEN (Restringido a Admin, Diseñador y Recepción)
+# TAB 1: NUEVA ORDEN
 # ------------------------------------------
 with tabs[1]:
-    roles_crear_orden = ["administrador", "diseñador", "recepción", "recepcion"]
-    
-    if rol_lower not in roles_crear_orden:
-        st.error("⛔ Acceso denegado. Solo los roles de Administrador, Diseñador y Recepción pueden crear nuevas órdenes.")
-    else:
-        st.subheader("➕ Crear Nueva Orden")
-        with st.form("form_nueva_orden", clear_on_submit=True):
-            cliente = st.text_input("Nombre del Cliente")
-            nombre_ord = st.text_input("Nombre de la Orden / Detalles")
-            area = st.selectbox("Área de Producción", ["Bordados", "Impresion"])
-            
-            formatos_soportados = ["pdf", "png", "jpg", "jpeg", "ia", "psd", "cdr", "emb", "eps", "dst", "tbf", "svg"]
-            archivos = st.file_uploader(
-                "Subir Archivos (PDF, PNG, JPG, IA, PSD, CDR, EMB, EPS, DST, TBF, SVG)", 
-                type=formatos_soportados, 
-                accept_multiple_files=True
-            )
-            
-            if st.form_submit_button("Guardar Orden"):
-                try:
-                    urls_archivos = []
-                    if archivos:
-                        for archivo in archivos:
-                            url = subir_a_supabase(archivo.getvalue(), archivo.name)
-                            urls_archivos.append(url)
-                    
-                    archivos_str = ",".join(urls_archivos)
-                    
-                    num_orden_auto = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                    
-                    # Incluimos tanto 'estado' como 'estado_actual' para evitar restricciones NOT-NULL
-                    supabase.table("ordenes").insert({
-                        "numero_orden": num_orden_auto,
-                        "nombre_cliente": cliente,
-                        "nombre_orden": nombre_ord,
-                        "area_produccion": area,
-                        "imagen_url": archivos_str,
-                        "estado": "Pendiente",
-                        "estado_actual": "Pendiente"
-                    }).execute()
-                    st.success("✅ Orden creada con éxito.")
-                except Exception as e:
-                    st.error(f"Error al guardar la orden: {e}")
+    with st.form("form_nueva_orden", clear_on_submit=True):
+        cliente = st.text_input("Nombre del Cliente")
+        nombre_ord = st.text_input("Nombre de la Orden / Detalles")
+        area = st.selectbox("Área", ["Bordados", "Impresion"])
+        archivos = st.file_uploader("Subir Archivos", accept_multiple_files=True)
+        
+        if st.form_submit_button("Guardar Orden"):
+            try:
+                urls = [subir_a_supabase(a.getvalue(), a.name) for a in archivos] if archivos else []
+                num_auto = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                
+                supabase.table("ordenes").insert({
+                    "numero_orden": num_auto,
+                    "nombre_cliente": cliente,
+                    "nombre_orden": nombre_ord,
+                    "area_produccion": area,
+                    "imagen_url": ",".join(urls),
+                    "estado": "Pendiente",
+                    "estado_actual": "Pendiente"
+                }).execute()
+                st.success("✅ Orden creada.")
+            except Exception as e:
+                st.error(f"Error: {e}")
 
 # ------------------------------------------
-# TAB 2: CONFIGURACIÓN / USUARIOS (SOLO ADMIN)
+# TAB 2: CONFIGURACIÓN
 # ------------------------------------------
 with tabs[2]:
-    if rol_lower != "administrador":
-        st.error("⛔ Acceso denegado. Esta sección es exclusiva para el Panel de Administración.")
-    else:
-        st.subheader("👥 Registrar Nuevo Usuario")
-        with st.form("form_reg_usuario", clear_on_submit=True):
-            n_nombre = st.text_input("Nombre Completo")
-            n_user = st.text_input("Nombre de Usuario")
+    if st.session_state['rol'] == "Administrador":
+        st.subheader("👥 Registrar Usuario")
+        with st.form("reg_user"):
+            n_nombre = st.text_input("Nombre")
+            n_user = st.text_input("Usuario")
             n_pass = st.text_input("Contraseña", type="password")
-            n_rol = st.selectbox("Rol Asignado", roles_disponibles)
-            
-            if st.form_submit_button("Guardar Usuario"):
-                try:
-                    supabase.table("usuarios").insert({
-                        "nombre": n_nombre, 
-                        "usuario": n_user, 
-                        "password": n_pass, 
-                        "rol_id": n_rol
-                    }).execute()
-                    st.success("✅ Usuario creado con éxito.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al registrar usuario: {e}")
-
-        st.divider()
-        st.subheader("🛠️ Usuarios Existentes")
-        try:
-            usuarios = supabase.table("usuarios").select("*").execute().data
-            if usuarios:
-                for u in usuarios:
-                    rol_usu = u.get('rol_id') or u.get('rol') or 'Sin rol'
-                    st.write(f"👤 **{u.get('nombre')}** | Usuario: `{u.get('usuario')}` | Rol: **{rol_usu}**")
-            else:
-                st.info("No hay usuarios registrados.")
-        except Exception as e:
-            st.error("No se pudieron cargar los usuarios.")
+            if st.form_submit_button("Guardar"):
+                supabase.table("usuarios").insert({"nombre": n_nombre, "usuario": n_user, "password": n_pass, "rol_id": "Usuario"}).execute()
+                st.success("Usuario creado")
+    else:
+        st.error("Acceso restringido a Administradores.")

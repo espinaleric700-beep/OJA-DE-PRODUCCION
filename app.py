@@ -90,8 +90,11 @@ st.sidebar.button("🚪 Cerrar Sesión", on_click=lambda: st.session_state.updat
 st.sidebar.info(f"👤 Usuario: **{st.session_state['usuario']}** | Rol: **{st.session_state['rol']}**")
 
 st.title("🧵 Pixel Thread - Gestión")
-tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "⚙️ Usuarios"])
+tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "📦 Almacén", "⚙️ Usuarios"])
 
+# ------------------------------------------
+# TAB 0: VER Y FILTRAR ÓRDENES
+# ------------------------------------------
 with tabs[0]:
     st.subheader("📋 Listado y Control de Órdenes")
     try:
@@ -132,6 +135,9 @@ with tabs[0]:
         else: st.info("No hay órdenes.")
     except Exception as e: st.error(f"Error: {e}")
 
+# ------------------------------------------
+# TAB 1: NUEVA ORDEN
+# ------------------------------------------
 with tabs[1]:
     with st.form("form_nueva_orden", clear_on_submit=True):
         cliente = st.text_input("Nombre del Cliente")
@@ -153,7 +159,87 @@ with tabs[1]:
             }).execute()
             st.success("✅ Orden creada.")
 
+# ------------------------------------------
+# TAB 2: ALMACÉN E INVENTARIO
+# ------------------------------------------
 with tabs[2]:
+    st.subheader("📦 Control de Inventario y Almacén")
+    
+    # Verificar si el usuario tiene permiso para modificar/agregar/eliminar
+    puede_modificar = st.session_state['rol'] in ["Administrador", "Recepción", "Almacén"]
+
+    if puede_modificar:
+        with st.expander("➕ Agregar Nuevo Producto al Inventario"):
+            with st.form("form_nuevo_inventario", clear_on_submit=True):
+                inv_nombre = st.text_input("Nombre del Producto (Ej. Camiseta Ojo de Ángel)")
+                inv_size = st.text_input("Talla / Size (Ej. S, M, L, XL, Única)")
+                inv_cantidad = st.number_input("Cantidad en Existencia", min_value=0, step=1)
+                
+                if st.form_submit_button("Guardar en Inventario"):
+                    try:
+                        supabase.table("almacen").insert({
+                            "nombre_producto": inv_nombre,
+                            "talla": inv_size,
+                            "cantidad": int(inv_cantidad)
+                        }).execute()
+                        st.success("✅ Producto agregado al inventario correctamente.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al guardar producto (asegúrate de tener creada la tabla 'almacen' en Supabase): {e}")
+        st.divider()
+
+    # Mostrar inventario existente
+    try:
+        inventario_db = supabase.table("almacen").select("*").execute().data
+        if inventario_db:
+            st.markdown("### 📋 Existencias Actuales")
+            for item in inventario_db:
+                item_id = item.get("id")
+                p_nombre = item.get("nombre_producto", "Sin nombre")
+                p_talla = item.get("talla", "N/A")
+                p_cantidad = item.get("cantidad", 0)
+
+                if puede_modificar:
+                    with st.expander(f"📦 {p_nombre} | Talla: **{p_talla}** | Stock: **{p_cantidad}**"):
+                        with st.form(f"form_edit_inv_{item_id}"):
+                            edit_nombre = st.text_input("Nombre del Producto", value=p_nombre, key=f"inv_n_{item_id}")
+                            edit_talla = st.text_input("Talla / Size", value=p_talla, key=f"inv_t_{item_id}")
+                            edit_cant = st.number_input("Cantidad", value=int(p_cantidad), min_value=0, step=1, key=f"inv_c_{item_id}")
+                            
+                            col_act, col_del = st.columns(2)
+                            btn_act = col_act.form_submit_button("💾 Guardar Cambios")
+                            btn_del = col_del.form_submit_button("🗑️ Eliminar Producto")
+                            
+                            if btn_act:
+                                try:
+                                    supabase.table("almacen").update({
+                                        "nombre_producto": edit_nombre,
+                                        "talla": edit_talla,
+                                        "cantidad": int(edit_cant)
+                                    }).eq("id", item_id).execute()
+                                    st.success("✅ Inventario actualizado.")
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Error al actualizar: {ex}")
+                                    
+                            if btn_del:
+                                try:
+                                    supabase.table("almacen").delete().eq("id", item_id).execute()
+                                    st.warning("⚠️ Producto eliminado del inventario.")
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Error al eliminar: {ex}")
+                else:
+                    st.info(f"📦 **{p_nombre}** — Talla: `{p_talla}` — Cantidad en Existencia: **{p_cantidad}**")
+        else:
+            st.info("No hay productos registrados en el almacén.")
+    except Exception as e:
+        st.error(f"Nota: Si es la primera vez que usas esta sección, recuerda crear la tabla 'almacen' en Supabase con columnas: id, nombre_producto, talla, cantidad. Error: {e}")
+
+# ------------------------------------------
+# TAB 3: GESTIÓN DE USUARIOS (ADMIN)
+# ------------------------------------------
+with tabs[3]:
     if st.session_state['rol'] == "Administrador":
         st.subheader("👥 Registrar Nuevo Usuario")
         with st.form("reg_user", clear_on_submit=True):

@@ -58,13 +58,12 @@ def subir_a_firebase(file_bytes, file_name, folder="ordenes/"):
 
 
 # ==========================================
-# AUTENTICACIÓN SIMPLIFICADA (EJEMPLO)
+# AUTENTICACIÓN Y ROLES
 # ==========================================
 st.sidebar.title("🔐 Control de Acceso")
 usuario = st.sidebar.text_input("Usuario")
 password = st.sidebar.text_input("Contraseña", type="password")
 
-# Consulta simulada de roles en Supabase
 roles_disponibles = [
     "Administrador",
     "Recepción",
@@ -73,7 +72,14 @@ roles_disponibles = [
     "Producción - Bordados",
     "Producción - Impresión",
 ]
-rol_seleccionado = st.sidebar.selectbox("Rol simulado (Temporal)", roles_disponibles)
+rol_seleccionado = st.sidebar.selectbox("Rol", roles_disponibles)
+
+# Validación de clave para el rol Administrador
+if rol_seleccionado == "Administrador":
+  clave_admin = st.sidebar.text_input("Clave de Administrador", type="password")
+  if clave_admin != "2580Admin":
+    st.sidebar.error("Clave de Administrador incorrecta.")
+    st.stop()
 
 if not usuario:
   st.warning("Por favor, ingresa tu usuario para continuar.")

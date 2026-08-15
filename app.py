@@ -9,7 +9,6 @@ import json
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
-# Actualización automática cada 10 segundos
 st_autorefresh(interval=10000, key="auto_refresh_ordenes")
 
 st.markdown("""
@@ -28,9 +27,6 @@ SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ==========================================
-# ROLES Y ESTADOS DISPONIBLES
-# ==========================================
 roles_disponibles = [
     "Administrador", 
     "Recepción", 
@@ -59,14 +55,11 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
-# ==========================================
-# GESTIÓN DE SESIÓN
-# ==========================================
 if "autenticado" not in st.session_state:
     st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 
-if "colores_inventario" not in st.session_state:
-    st.session_state["colores_inventario"] = {}
+if "colores_inventario_avanzado" not in st.session_state:
+    st.session_state["colores_inventario_avanzado"] = {}
 
 st.sidebar.title("🔐 Control de Acceso")
 if not st.session_state["autenticado"]:
@@ -90,18 +83,12 @@ if not st.session_state["autenticado"]:
                 st.sidebar.error(f"Error: {e}")
     st.stop()
 
-# ==========================================
-# PANEL PRINCIPAL
-# ==========================================
 st.sidebar.button("🚪 Cerrar Sesión", on_click=lambda: st.session_state.update({"autenticado": False}))
 st.sidebar.info(f"👤 Usuario: **{st.session_state['usuario']}** | Rol: **{st.session_state['rol']}**")
 
 st.title("🧵 Pixel Thread - Gestión")
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "📦 Almacén", "⚙️ Usuarios"])
 
-# ------------------------------------------
-# TAB 0: VER Y FILTRAR ÓRDENES
-# ------------------------------------------
 with tabs[0]:
     st.subheader("📋 Listado y Control de Órdenes")
     try:
@@ -142,9 +129,6 @@ with tabs[0]:
         else: st.info("No hay órdenes.")
     except Exception as e: st.error(f"Error: {e}")
 
-# ------------------------------------------
-# TAB 1: NUEVA ORDEN
-# ------------------------------------------
 with tabs[1]:
     with st.form("form_nueva_orden", clear_on_submit=True):
         cliente = st.text_input("Nombre del Cliente")
@@ -166,77 +150,86 @@ with tabs[1]:
             }).execute()
             st.success("✅ Orden creada.")
 
-# ------------------------------------------
-# TAB 2: ALMACÉN E INVENTARIO
-# ------------------------------------------
 with tabs[2]:
     st.subheader("📦 Control de Inventario y Almacén")
-    
     puede_modificar = st.session_state['rol'] in ["Administrador", "Recepción", "Almacén"]
 
     if puede_modificar:
-        with st.expander("➕ Agregar Nuevo Producto con Colores y Tallas", expanded=False):
-            inv_nombre = st.text_input("NOMBRE DE LA PRENDA (Ej. TSHIRT ALGODON)", key="input_nombre_prenda_multi")
-            foto_prenda = st.file_uploader("SUBIR IMAGEN DE PRENDA", type=["png", "jpg", "jpeg"], key="input_foto_prenda_multi")
+        with st.expander("➕ Agregar Nuevo Producto con Colores, Tallas e Imagen por Color", expanded=False):
+            inv_nombre = st.text_input("NOMBRE DE LA PRENDA (Ej. TSHIRT ALGODON)", key="input_nombre_prenda_color_img")
             
             st.markdown("---")
-            st.markdown("🎨 **Paleta de Colores y Existencias por Talla**")
+            st.markdown("🎨 **Añadir Color, Tono y su Imagen Correspondiente**")
             
-            col_c1, col_c2 = st.columns([2, 1])
-            with col_c1:
-                nuevo_color = st.text_input("AGREGAR COLOR (Ej. Negro, Blanco, #FF00FF)", key="input_nuevo_color_nombre")
-            with col_c2:
-                st.markdown("<br>", unsafe_allow_html=True)
-                btn_agregar_color = st.button("➕ Añadir Color")
-                
-            if btn_agregar_color and nuevo_color.strip():
-                c_clean = nuevo_color.strip()
-                if c_clean not in st.session_state["colores_inventario"]:
-                    st.session_state["colores_inventario"][c_clean] = {t: 0 for t in tallas_disponibles}
-                    st.success(f"Color '{c_clean}' agregado con éxito.")
+            col_picker, col_text = st.columns([1, 2])
+            with col_picker:
+                color_picker_val = st.color_picker("Tono", "#3b82f6", key="picker_color_hex_v2")
+            with col_text:
+                nuevo_color = st.text_input("NOMBRE O CÓDIGO DEL COLOR", value=color_picker_val, key="input_nuevo_color_nombre_v2")
+            
+            foto_color = st.file_uploader(f"🖼️ Subir Imagen para el color: `{nuevo_color}`", type=["png", "jpg", "jpeg"], key=f"uploader_img_{nuevo_color}")
+            
+            if st.button("➕ Añadir este Color al Producto"):
+                if nuevo_color.strip():
+                    c_clean = nuevo_color.strip()
+                    if c_clean not in st.session_state["colores_inventario_avanzado"]:
+                        st.session_state["colores_inventario_avanzado"][c_clean] = {
+                            "tallas": {t: 0 for t in tallas_disponibles},
+                            "imagen_file": foto_color
+                        }
+                        st.success(f"Color '{c_clean}' agregado con éxito.")
+                        st.rerun()
+                    else:
+                        st.warning("Este color ya está en la lista.")
                 else:
-                    st.warning("Este color ya está en la lista.")
+                    st.error("Ingresa un nombre o código de color válido.")
 
-            if st.session_state["colores_inventario"]:
-                st.markdown("#### 🔍 Selecciona un color para configurar sus tallas:")
-                color_activo = st.selectbox("Color activo:", list(st.session_state["colores_inventario"].keys()), key="select_color_activo")
+            if st.session_state["colores_inventario_avanzado"]:
+                st.markdown("#### 🔍 Configurar Existencias y Tallas por Color:")
+                color_activo = st.selectbox("Selecciona color a configurar:", list(st.session_state["colores_inventario_avanzado"].keys()), key="select_color_activo_v2")
                 
                 if color_activo:
-                    st.markdown(f"📏 **Tallas para el color: `{color_activo}`**")
+                    st.markdown(f"📏 **Tallas para `{color_activo}`**")
                     cols_grid = st.columns(3)
                     for idx, talla in enumerate(tallas_disponibles):
                         col_actual = cols_grid[idx % 3]
                         with col_actual:
-                            val_actual = st.session_state["colores_inventario"][color_activo].get(talla, 0)
-                            nueva_cant = st.number_input(f"Talla {talla}", min_value=0, step=1, value=int(val_actual), key=f"cant_{color_activo}_{talla}")
-                            st.session_state["colores_inventario"][color_activo][talla] = int(nueva_cant)
+                            val_actual = st.session_state["colores_inventario_avanzado"][color_activo]["tallas"].get(talla, 0)
+                            nueva_cant = st.number_input(f"Talla {talla}", min_value=0, step=1, value=int(val_actual), key=f"cant_v2_{color_activo}_{talla}")
+                            st.session_state["colores_inventario_avanzado"][color_activo]["tallas"][talla] = int(nueva_cant)
                             
-                    if st.button("🗑️ Eliminar este color", key=f"del_col_{color_activo}"):
-                        del st.session_state["colores_inventario"][color_activo]
+                    if st.button("🗑️ Eliminar este color", key=f"del_col_v2_{color_activo}"):
+                        del st.session_state["colores_inventario_avanzado"][color_activo]
                         st.rerun()
 
             st.markdown("---")
             if st.button("💾 Guardar Inventario Completo"):
                 if not inv_nombre.strip():
                     st.error("⚠️ Debes ingresar el nombre del producto.")
-                elif not st.session_state["colores_inventario"]:
-                    st.error("⚠️ Debes agregar al menos un color con sus tallas.")
+                elif not st.session_state["colores_inventario_avanzado"]:
+                    st.error("⚠️ Debes agregar al menos un color con sus tallas e imágenes.")
                 else:
                     try:
-                        tallas_json_str = json.dumps(st.session_state["colores_inventario"])
-                        
-                        foto_url = ""
-                        if foto_prenda:
-                            foto_url = subir_a_supabase(foto_prenda.getvalue(), foto_prenda.name)
+                        data_a_guardar = {}
+                        for col_key, col_data in st.session_state["colores_inventario_avanzado"].items():
+                            img_file = col_data["imagen_file"]
+                            img_url = ""
+                            if img_file is not None:
+                                img_url = subir_a_supabase(img_file.getvalue(), img_file.name)
+                            
+                            data_a_guardar[col_key] = {
+                                "tallas": col_data["tallas"],
+                                "imagen_url": img_url
+                            }
                         
                         supabase.table("almacen").insert({
                             "nombre_producto": inv_nombre,
-                            "tallas_existencias": tallas_json_str,
-                            "imagen_url": foto_url
+                            "tallas_existencias": json.dumps(data_a_guardar),
+                            "imagen_url": ""
                         }).execute()
                         
-                        st.session_state["colores_inventario"] = {}
-                        st.success("✅ ¡Producto guardado en el inventario con éxito!")
+                        st.session_state["colores_inventario_avanzado"] = {}
+                        st.success("✅ ¡Producto con imágenes por color guardado con éxito!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar producto: {e}")
@@ -250,38 +243,42 @@ with tabs[2]:
                 item_id = item.get("id")
                 p_nombre = item.get("nombre_producto", "Sin nombre")
                 p_tallas_str = item.get("tallas_existencias", "")
-                p_imagen = item.get("imagen_url", "")
+                p_imagen_general = item.get("imagen_url", "")
 
                 dict_colores = {}
-                es_json = False
+                es_avanzado = False
                 try:
                     dict_colores = json.loads(p_tallas_str)
                     if isinstance(dict_colores, dict):
-                        es_json = True
+                        primer_valor = next(iter(dict_colores.values())) if dict_colores else None
+                        if isinstance(primer_valor, dict) and "tallas" in primer_valor:
+                            es_avanzado = True
                 except:
                     pass
 
                 with st.container():
                     st.markdown(f"### 🏷️ {p_nombre}")
-                    col_img, col_info = st.columns([1, 3])
                     
-                    with col_img:
-                        if p_imagen:
-                            st.image(p_imagen, use_container_width=True)
-                        else:
-                            st.info("Sin foto disponible")
+                    if es_avanzado and dict_colores:
+                        lista_cols = list(dict_colores.keys())
+                        color_seleccionado_ver = st.selectbox("🎨 Selecciona el color (la imagen cambiará):", lista_cols, key=f"ver_col_avanzado_{item_id}")
+                        
+                        col_img, col_info = st.columns([1, 3])
+                        
+                        if color_seleccionado_ver:
+                            info_color_actual = dict_colores[color_seleccionado_ver]
+                            img_url_color = info_color_actual.get("imagen_url", "")
+                            tallas_del_color = info_color_actual.get("tallas", {})
                             
-                    with col_info:
-                        if es_json and dict_colores:
-                            st.markdown("#### 🎨 Selecciona el color para ver sus existencias:")
-                            lista_cols = list(dict_colores.keys())
-                            color_seleccionado_ver = st.selectbox("Color:", lista_cols, key=f"ver_col_{item_id}")
-                            
-                            if color_seleccionado_ver:
-                                tallas_del_color = dict_colores[color_seleccionado_ver]
+                            with col_img:
+                                if img_url_color:
+                                    st.image(img_url_color, use_container_width=True)
+                                else:
+                                    st.info("Sin foto para este color")
+                                    
+                            with col_info:
                                 cols_por_fila = 3
                                 tallas_items = [(t, tallas_del_color.get(t, 0)) for t in tallas_disponibles]
-                                
                                 st.markdown(f"**Existencias para el color: `{color_seleccionado_ver}`**")
                                 for i in range(0, len(tallas_items), cols_por_fila):
                                     fila_cols = st.columns(cols_por_fila)
@@ -292,41 +289,45 @@ with tabs[2]:
                                                 if puede_modificar:
                                                     sub_c_btn1, sub_c_txt, sub_c_btn2 = st.columns([0.6, 2, 0.6], gap="small")
                                                     with sub_c_btn1:
-                                                        if st.button("➖", key=f"m_{item_id}_{color_seleccionado_ver}_{talla}"):
+                                                        if st.button("➖", key=f"m_av_{item_id}_{color_seleccionado_ver}_{talla}"):
                                                             if cantidad > 0:
-                                                                dict_colores[color_seleccionado_ver][talla] = cantidad - 1
+                                                                dict_colores[color_seleccionado_ver]["tallas"][talla] = cantidad - 1
                                                                 supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
                                                                 st.rerun()
                                                     with sub_c_txt:
                                                         st.markdown(f"<div style='background-color: #111827; padding: 4px 2px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.8em; font-weight: bold;'>{talla}</span><br><span style='font-size: 0.85em; color: #60a5fa;'>{cantidad}</span></div>", unsafe_allow_html=True)
                                                     with sub_c_btn2:
-                                                        if st.button("➕", key=f"p_{item_id}_{color_seleccionado_ver}_{talla}"):
-                                                            dict_colores[color_seleccionado_ver][talla] = cantidad + 1
+                                                        if st.button("➕", key=f"p_av_{item_id}_{color_seleccionado_ver}_{talla}"):
+                                                            dict_colores[color_seleccionado_ver]["tallas"][talla] = cantidad + 1
                                                             supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
                                                             st.rerun()
                                                 else:
                                                     st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 6px; border: 1px solid #1f2937; text-align: center;'><b>{talla}</b><br><span style='color: #60a5fa;'>{cantidad}</span></div>", unsafe_allow_html=True)
-                        else:
+                    else:
+                        col_img, col_info = st.columns([1, 3])
+                        with col_img:
+                            if p_imagen_general:
+                                st.image(p_imagen_general, use_container_width=True)
+                            else:
+                                st.info("Sin foto disponible")
+                        with col_info:
                             st.write(f"**Tallas/Existencias:** {p_tallas_str}")
 
-                        if puede_modificar:
-                            with st.expander("🛠️ Opciones Avanzadas (Eliminar producto)"):
-                                if st.button("🗑️ Eliminar Producto", key=f"del_prod_{item_id}"):
-                                    try:
-                                        supabase.table("almacen").delete().eq("id", item_id).execute()
-                                        st.warning("⚠️ Producto eliminado del inventario.")
-                                        st.rerun()
-                                    except Exception as ex:
-                                        st.error(f"Error al eliminar: {ex}")
+                    if puede_modificar:
+                        with st.expander("🛠️ Opciones Avanzadas (Eliminar producto)"):
+                            if st.button("🗑️ Eliminar Producto", key=f"del_prod_{item_id}"):
+                                try:
+                                    supabase.table("almacen").delete().eq("id", item_id).execute()
+                                    st.warning("⚠️ Producto eliminado del inventario.")
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Error al eliminar: {ex}")
                     st.divider()
         else:
             st.info("No hay productos registrados en el almacén.")
     except Exception as e:
         st.error(f"Error al cargar el almacén: {e}")
 
-# ------------------------------------------
-# TAB 3: GESTIÓN DE USUARIOS (ADMIN)
-# ------------------------------------------
 with tabs[3]:
     if st.session_state['rol'] == "Administrador":
         st.subheader("👥 Registrar Nuevo Usuario")
@@ -394,4 +395,4 @@ with tabs[3]:
         except Exception as e:
             st.error(f"Error al cargar la lista de usuarios: {e}")
     else: 
-        st.error("⛔ Acceso restringido.")
+        st.error("⛔ Acceso Restringido.")

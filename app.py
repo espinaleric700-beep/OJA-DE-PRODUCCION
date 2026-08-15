@@ -68,7 +68,8 @@ if not st.session_state["autenticado"]:
                     if usuario_encontrado:
                         st.session_state["autenticado"] = True
                         st.session_state["usuario"] = usuario_input
-                        st.session_state["rol"] = rol_input
+                        # Asignar el rol real obtenido de la base de datos si existe
+                        st.session_state["rol"] = usuario_encontrado.get("rol", rol_input)
                         st.rerun()
                     else:
                         st.sidebar.error("❌ Usuario o contraseña incorrectos.")
@@ -258,16 +259,7 @@ def cargar_panel_principal():
                             st.success("Usuario creado con éxito.")
                             st.rerun()
                         except Exception as e:
-                            try:
-                                supabase.table("usuarios").insert({
-                                    "nombre": n_nombre,
-                                    "usuario": n_user,
-                                    "password": n_pass
-                                }).execute()
-                                st.warning("Usuario creado, pero la columna 'rol' no existe en Supabase.")
-                                st.rerun()
-                            except Exception as err:
-                                st.error(f"Error al registrar: {err}")
+                            st.error(f"Error al registrar usuario (asegúrate de que la columna 'rol' exista en Supabase): {e}")
 
             st.markdown("---")
             
@@ -302,13 +294,7 @@ def cargar_panel_principal():
                                         st.success("¡Actualizado correctamente!")
                                         st.rerun()
                                     except Exception as e:
-                                        supabase.table("usuarios").update({
-                                            "nombre": nuevo_nombre,
-                                            "usuario": nuevo_user,
-                                            "password": nuevo_pass
-                                        }).eq("id", u["id"]).execute()
-                                        st.warning("Actualizado (la columna 'rol' no existe en Supabase).")
-                                        st.rerun()
+                                        st.error(f"Error al actualizar usuario: {e}")
                             
                             with col2:
                                 st.write("###") 

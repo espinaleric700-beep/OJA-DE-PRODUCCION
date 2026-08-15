@@ -180,7 +180,8 @@ with tabs[2]:
                     if c_clean not in st.session_state["colores_inventario_avanzado"]:
                         st.session_state["colores_inventario_avanzado"][c_clean] = {
                             "tallas": {t: 0 for t in tallas_disponibles},
-                            "imagen_file": foto_color
+                            "imagen_file": foto_color,
+                            "hex": color_picker_val if color_picker_val.startswith("#") else "#3b82f6"
                         }
                         st.success(f"Color '{c_clean}' agregado con éxito.")
                         st.rerun()
@@ -224,7 +225,8 @@ with tabs[2]:
                             
                             data_a_guardar[col_key] = {
                                 "tallas": col_data["tallas"],
-                                "imagen_url": img_url
+                                "imagen_url": img_url,
+                                "hex": col_data.get("hex", "#3b82f6")
                             }
                         
                         supabase.table("almacen").insert({
@@ -267,24 +269,48 @@ with tabs[2]:
                     if es_avanzado and dict_colores:
                         lista_cols = list(dict_colores.keys())
                         
-                        # Selector en forma de Botones horizontales (Pills) para hacer clic directo
-                        st.markdown("🎨 **Selecciona el color (la imagen cambiará):**")
                         key_pills = f"pills_color_{item_id}"
-                        if key_pills not in st.session_state:
-                            st.session_state[key_pills] = lista_cols[0]
-                        
-                        # Si el color seleccionado ya no existe en la lista, reiniciamos al primero
-                        if st.session_state[key_pills] not in lista_cols:
+                        if key_pills not in st.session_state or st.session_state[key_pills] not in lista_cols:
                             st.session_state[key_pills] = lista_cols[0]
 
-                        cols_colores = st.columns(len(lista_cols))
+                        # Inyectar estilos CSS para botones de colores compactos y pegados sin espacio
+                        st.markdown("""
+                            <style>
+                            .color-btn-container { display: flex; flex-wrap: wrap; gap: 0px; margin-bottom: 10px; }
+                            .color-btn-container div[data-testid="column"] { width: auto !important; flex: 0 0 auto !important; padding: 0px !important; margin: 0px !important; }
+                            .color-btn-container .stButton > button { border-radius: 0px !important; border-right: 1px solid rgba(255,255,255,0.2) !important; font-size: 0.85rem !important; padding: 0.3rem 0.8rem !important; margin: 0px !important; }
+                            .color-btn-container div[data-testid="column"]:first-child .stButton > button { border-top-left-radius: 6px !important; border-bottom-left-radius: 6px !important; }
+                            .color-btn-container div[data-testid="column"]:last-child .stButton > button { border-top-right-radius: 6px !important; border-bottom-right-radius: 6px !important; border-right: none !important; }
+                            </style>
+                        """, unsafe_allow_html=True)
+
+                        st.markdown("🎨 **Selecciona el color:**")
+                        st.markdown('<div class="color-btn-container">', unsafe_allow_html=True)
+                        cols_colores = st.columns(len(lista_cols), gap="small")
                         for idx, col_name in enumerate(lista_cols):
                             with cols_colores[idx]:
+                                info_col = dict_colores[col_name]
+                                color_hex = info_col.get("hex", "#3b82f6") if isinstance(info_col, dict) else "#3b82f6"
                                 es_seleccionado = (st.session_state[key_pills] == col_name)
-                                estilo_btn = "primary" if es_seleccionado else "secondary"
-                                if st.button(col_name, key=f"btn_col_{item_id}_{col_name}", type=estilo_btn):
+                                
+                                # Estilo de borde brillante si está seleccionado
+                                border_style = "border: 2px solid #ffffff !important;" if es_seleccionado else "border: 1px solid rgba(255,255,255,0.2) !important;"
+                                
+                                # Renderizar botón con su color correspondiente
+                                btn_html_style = f"background-color: {color_hex} !important; color: #ffffff !important; {border_style} font-weight: bold; width: 100%;"
+                                
+                                st.markdown(f"""
+                                    <style>
+                                    div.stButton > button#btn_col_{item_id}_{idx} {{
+                                        {btn_html_style}
+                                    }}
+                                    </style>
+                                """, unsafe_allow_html=True)
+                                
+                                if st.button(col_name, key=f"btn_col_{item_id}_{idx}"):
                                     st.session_state[key_pills] = col_name
                                     st.rerun()
+                        st.markdown('</div>', unsafe_allow_html=True)
 
                         color_seleccionado_ver = st.session_state[key_pills]
                         

@@ -142,13 +142,20 @@ with tabs[0]:
                 with st.expander("Ver detalles completos"):
                     col_info1, col_info2 = st.columns(2)
                     with col_info1:
-                        st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
+                        # Restringir teléfono a Recepción y Administrador
+                        if st.session_state['rol'] in ["Administrador", "Recepción"]:
+                            st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
+                        
                         st.write(f"**Fecha de Entrega:** {o.get('fecha_entrega', 'N/D')}")
                         st.write(f"**Tipo de Servicio:** {o.get('tipo_servicio', 'N/D')}")
+                        
                     with col_info2:
-                        st.write(f"**Total:** ${o.get('total', 0)}")
-                        st.write(f"**Abono:** ${o.get('abono', 0)}")
-                        st.write(f"**Restante:** ${o.get('restante', 0)}")
+                        # Restringir información financiera (Total, Abono, Restante) a Recepción y Administrador
+                        if st.session_state['rol'] in ["Administrador", "Recepción"]:
+                            st.write(f"**Total:** ${o.get('total', 0)}")
+                            st.write(f"**Abono:** ${o.get('abono', 0)}")
+                            st.write(f"**Restante:** ${o.get('restante', 0)}")
+                            
                     st.markdown("---")
                     st.markdown("📜 **Historial de Cambios:**")
                     try:

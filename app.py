@@ -39,34 +39,40 @@ if not st.session_state["autenticado"]:
         clave_admin = ""
 
     if st.sidebar.button("Iniciar Sesión"):
-        if rol_input == "Administrador" and clave_admin != "2580Admin":
-            st.sidebar.error("Clave de Administrador incorrecta.")
-        elif not usuario_input or not password_input:
+        if not usuario_input or not password_input:
             st.sidebar.warning("Por favor ingresa usuario y contraseña.")
+        # Acceso maestro directo para el Administrador con la clave maestra
+        elif rol_input == "Administrador" and usuario_input.strip().lower() == "admin" and password_input == "2580Admin" and clave_admin == "2580Admin":
+            st.session_state["autenticado"] = True
+            st.session_state["usuario"] = "admin"
+            st.session_state["rol"] = "Administrador"
+            st.rerun()
         else:
-            try:
-                # Traemos todos los usuarios para validar sin problemas de mayúsculas/minúsculas o espacios
-                res = supabase.table("usuarios").select("*").execute()
-                usuarios_db = res.data
-                
-                usuario_encontrado = None
-                limpio_input = usuario_input.strip().lower()
-                
-                for u in usuarios_db:
-                    if str(u.get("usuario", "")).strip().lower() == limpio_input:
-                        if str(u.get("password", "")) == str(password_input):
-                            usuario_encontrado = u
-                            break
+            if rol_input == "Administrador" and clave_admin != "2580Admin":
+                st.sidebar.error("Clave de Administrador incorrecta.")
+            else:
+                try:
+                    res = supabase.table("usuarios").select("*").execute()
+                    usuarios_db = res.data
+                    
+                    usuario_encontrado = None
+                    limpio_input = usuario_input.strip().lower()
+                    
+                    for u in usuarios_db:
+                        if str(u.get("usuario", "")).strip().lower() == limpio_input:
+                            if str(u.get("password", "")) == str(password_input):
+                                usuario_encontrado = u
+                                break
 
-                if usuario_encontrado:
-                    st.session_state["autenticado"] = True
-                    st.session_state["usuario"] = usuario_encontrado.get("usuario")
-                    st.session_state["rol"] = rol_input
-                    st.rerun()
-                else:
-                    st.sidebar.error("❌ Usuario o contraseña incorrectos.")
-            except Exception as e:
-                st.sidebar.error(f"Error al verificar credenciales: {e}")
+                    if usuario_encontrado:
+                        st.session_state["autenticado"] = True
+                        st.session_state["usuario"] = usuario_encontrado.get("usuario")
+                        st.session_state["rol"] = rol_input
+                        st.rerun()
+                    else:
+                        st.sidebar.error("❌ Usuario o contraseña incorrectos.")
+                except Exception as e:
+                    st.sidebar.error(f"Error al verificar credenciales: {e}")
     st.stop()
 
 usuario = st.session_state["usuario"]

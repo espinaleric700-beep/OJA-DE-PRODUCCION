@@ -289,52 +289,44 @@ with tabs[2]:
                         st.markdown("Colores")
                         st.markdown(f'<div id="anchor_colores_{item_id}"></div>', unsafe_allow_html=True)
 
-                        cols_botones = st.columns(len(lista_cols))
-                        mapa_botones_js = {}
-                        
+                        # Renderizamos los botones en contenedor compacto tipo Flexbox (sin ocupar todo el ancho)
+                        html_botones = f"""
+                        <div id="flex_colors_{item_id}" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                        """
                         for i, c_name in enumerate(lista_cols):
                             c_hex = dict_colores[c_name].get("hex", "#3b82f6")
                             txt_col = obtener_color_texto(c_hex)
                             es_sel = (st.session_state[key_activo] == c_name)
+                            borde_estilo = "3px solid #ffffff" if es_sel else "1px solid rgba(255, 255, 255, 0.3)"
+                            shadow_estilo = f"0 0 10px {c_hex}" if es_sel else "none"
                             
-                            mapa_botones_js[f"btn_col_{item_id}_{i}"] = {
-                                "bg": c_hex,
-                                "color": txt_col,
-                                "border": "3px solid #ffffff" if es_sel else "1px solid rgba(255, 255, 255, 0.3)",
-                                "shadow": f"0 0 10px {c_hex}" if es_sel else "none"
-                            }
-                            
-                            with cols_botones[i]:
-                                if st.button(c_name, key=f"btn_col_{item_id}_{i}", use_container_width=True):
-                                    st.session_state[key_activo] = c_name
-                                    st.rerun()
+                            html_botones += f"""
+                            <button onclick="window.location.href='?sel_col_{item_id}={c_name}'" style="
+                                background-color: {c_hex} !important;
+                                color: {txt_col} !important;
+                                border: {borde_estilo} !important;
+                                box-shadow: {shadow_estilo} !important;
+                                font-weight: bold !important;
+                                padding: 8px 16px !important;
+                                border-radius: 6px !important;
+                                cursor: pointer !important;
+                                min-width: 120px !important;
+                                max-width: 180px !important;
+                                font-size: 0.9rem !important;
+                                text-transform: uppercase !important;
+                            ">{c_name}</button>
+                            """
+                        html_botones += "</div>"
+                        st.markdown(html_botones, unsafe_allow_html=True)
 
-                        # Inyección directa mediante JavaScript para forzar los estilos reales en los botones
-                        js_code = f"""
-                        <script>
-                        const config_{item_id} = {json.dumps(mapa_botones_js)};
-                        const anchor_{item_id} = document.getElementById("anchor_colores_{item_id}");
-                        if (anchor_{item_id}) {{
-                            const parentBlock_{item_id} = anchor_{item_id}.nextElementSibling;
-                            if (parentBlock_{item_id} && parentBlock_{item_id}.getAttribute('data-testid') === 'stHorizontalBlock') {{
-                                const cols = parentBlock_{item_id}.children;
-                                Object.keys(config_{item_id}).forEach((key, index) => {{
-                                    if (cols[index]) {{
-                                        const btn = cols[index].querySelector('button');
-                                        if (btn) {{
-                                            btn.style.backgroundColor = config_{item_id}[key].bg;
-                                            btn.style.color = config_{item_id}[key].color;
-                                            btn.style.border = config_{item_id}[key].border;
-                                            btn.style.boxShadow = config_{item_id}[key].shadow;
-                                            btn.style.fontWeight = "bold";
-                                        }}
-                                    }}
-                                }});
-                            }}
-                        }}
-                        </script>
-                        """
-                        st.markdown(js_code, unsafe_allow_html=True)
+                        # Manejo de selección por query params nativo de Streamlit
+                        query_params = st.query_params
+                        param_key = f"sel_col_{item_id}"
+                        if param_key in query_params:
+                            val_param = query_params[param_key]
+                            if val_param in lista_cols and st.session_state[key_activo] != val_param:
+                                st.session_state[key_activo] = val_param
+                                st.rerun()
 
                         color_seleccionado_ver = st.session_state[key_activo]
                         st.markdown("<br>", unsafe_allow_html=True)

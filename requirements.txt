@@ -2,5 +2,5 @@ streamlit
 supabase
 firebase-admin
 pandas
-pip install streamlit-autorefresh
+streamlit-autorefresh
 supabase

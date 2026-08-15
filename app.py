@@ -13,7 +13,8 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     path = f"ordenes/{datetime.now().strftime('%Y%m%d%H%M%S')}_{file_name}"
-    supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "image/jpeg", "upsert": "true"})
+    # Usamos content-type genérico para admitir formatos de diseño pesados
+    supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
 # Lista por defecto para evitar "No options to select"
@@ -83,33 +84,69 @@ st.title("🧵 Pixel Thread - Gestión")
 
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "⚙️ Configuración / Usuarios"])
 
+rol_actual = str(st.session_state.get("rol", "")).strip()
+rol_lower = rol_actual.lower()
+
 # ------------------------------------------
-# TAB 0: VER ÓRDENES
+# TAB 0: VER ÓRDENES Y CAMBIAR ESTADOS
 # ------------------------------------------
 with tabs[0]:
-    st.subheader("📋 Listado de Órdenes")
+    st.subheader("📋 Listado y Control de Órdenes")
     try:
         ordenes = supabase.table("ordenes").select("*").execute().data
         if ordenes:
+            estados_posibles = ["Pendiente", "En Proceso", "Completado", "Entregado"]
+            
             for o in ordenes:
-                with st.expander(f"Orden #{o.get('id', 'N/A')} - Cliente: {o.get('cliente', 'General')} [{o.get('area', 'General')}]"):
-                    st.write(f"**Área:** {o.get('area', 'No especificada')}")
+                area_orden = o.get('area', 'General')
+                
+                # Determinamos si el usuario actual tiene permiso para modificar esta orden específica
+                # El Admin y Diseñador pueden ver y modificar todo. Los demás solo lo de su área respectiva.
+                es_admin_o_disenador = rol_lower in ["administrador", "diseñador"]
+                es_su_area = (rol_lower == "producción - bordados" and area_orden == "Bordado") or \
+                             (rol_lower == "producción - impresión" and area_orden == "Impresión")
+                
+                puede_modificar = es_admin_o_disenador or es_su_area
+                
+                with st.expander(f"Orden #{o.get('id', 'N/A')} - Cliente: {o.get('cliente', 'General')} | Área: [{area_orden}] - Estado: {o.get('estado', 'Pendiente')}"):
+                    st.write(f"**Área de Trabajo:** {area_orden}")
                     st.write(f"**Detalles:** {o.get('detalles', 'Sin detalles')}")
-                    st.write(f"**Estado:** {o.get('estado', 'Pendiente')}")
+                    st.write(f"**Fecha de Creación:** {o.get('fecha', 'N/A')}")
                     
+                    estado_actual = o.get('estado', 'Pendiente')
+                    
+                    if puede_modificar:
+                        nuevo_estado = st.selectbox(
+                            "Actualizar Estado de la Orden",
+                            estados_posibles,
+                            index=estados_posibles.index(estado_actual) if estado_actual in estados_posibles else 0,
+                            key=f"estado_{o.get('id')}"
+                        )
+                        if st.button("Guardar Cambios de Estado", key=f"btn_{o.get('id')}"):
+                            try:
+                                supabase.table("ordenes").update({"estado": nuevo_estado}).eq("id", o.get("id")).execute()
+                                st.success("✅ Estado actualizado correctamente.")
+                                st.rerun()
+                            except Exception as ex:
+                                st.error(f"Error al actualizar estado: {ex}")
+                    else:
+                        st.info(f"📌 Estado actual: **{estado_actual}** (Solo lectura para tu rol actual)")
+
                     imagenes = o.get('imagen_url')
                     if imagenes:
-                        # Si se guardó como texto separado por comas o lista
                         if isinstance(imagenes, str):
-                            lista_imgs = [img.strip() for img in imagenes.split(",") if img.strip()]
+                            lista_archivos = [arch.strip() for arch in imagenes.split(",") if arch.strip()]
                         else:
-                            lista_imgs = imagenes
+                            lista_archivos = imagenes
                         
-                        st.write("**Archivos adjuntos:**")
-                        cols = st.columns(min(len(lista_imgs), 4))
-                        for idx, img_url in enumerate(lista_imgs):
-                            with cols[idx % 4]:
-                                st.image(img_url, width=150)
+                        st.write("**Archivos y Diseños Adjuntos:**")
+                        for idx, archivo_url in enumerate(lista_archivos):
+                            nombre_archivo = archivo_url.split("/")[-1]
+                            # Verificamos si es una imagen visualizable o un archivo descargable
+                            if archivo_url.lower().endswith(('.png', '.jpg', '.jpeg', '.svg')):
+                                st.image(archivo_url, width=200, caption=nombre_archivo)
+                            else:
+                                st.markdown(f"📥 [Descargar archivo {idx+1}: {nombre_archivo}]({archivo_url})")
         else:
             st.info("No hay órdenes registradas.")
     except Exception as e:
@@ -119,10 +156,9 @@ with tabs[0]:
 # TAB 1: NUEVA ORDEN (Restringido a Admin, Diseñador y Recepción)
 # ------------------------------------------
 with tabs[1]:
-    rol_actual_lower = str(st.session_state.get("rol")).strip().lower()
-    roles_permitidos = ["administrador", "diseñador", "recepción", "recepcion"]
+    roles_crear_orden = ["administrador", "diseñador", "recepción", "recepcion"]
     
-    if rol_actual_lower not in roles_permitidos:
+    if rol_lower not in roles_crear_orden:
         st.error("⛔ Acceso denegado. Solo los roles de Administrador, Diseñador y Recepción pueden crear nuevas órdenes.")
     else:
         st.subheader("➕ Crear Nueva Orden")
@@ -130,24 +166,30 @@ with tabs[1]:
             cliente = st.text_input("Nombre del Cliente")
             area = st.selectbox("Área de Producción", ["Bordado", "Impresión"])
             detalles = st.text_area("Detalles del Diseño / Requerimientos")
-            archivos = st.file_uploader("Subir Imágenes o Referencias (Múltiples)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+            
+            # Extensiones solicitadas para archivos de diseño y formato general
+            formatos_soportados = ["pdf", "png", "jpg", "jpeg", "ia", "psd", "cdr", "emb", "eps", "dst", "tbf", "svg"]
+            archivos = st.file_uploader(
+                "Subir Archivos (PDF, PNG, JPG, IA, PSD, CDR, EMB, EPS, DST, TBF, SVG)", 
+                type=formatos_soportados, 
+                accept_multiple_files=True
+            )
             
             if st.form_submit_button("Guardar Orden"):
                 try:
-                    urls_imagenes = []
+                    urls_archivos = []
                     if archivos:
                         for archivo in archivos:
                             url = subir_a_supabase(archivo.getvalue(), archivo.name)
-                            urls_imagenes.append(url)
+                            urls_archivos.append(url)
                     
-                    # Unimos las URLs separadas por comas para guardarlas en la base de datos
-                    imagenes_str = ",".join(urls_imagenes)
+                    archivos_str = ",".join(urls_archivos)
                     
                     supabase.table("ordenes").insert({
                         "cliente": cliente,
                         "area": area,
                         "detalles": detalles,
-                        "imagen_url": imagenes_str,
+                        "imagen_url": archivos_str,
                         "estado": "Pendiente",
                         "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }).execute()
@@ -159,7 +201,7 @@ with tabs[1]:
 # TAB 2: CONFIGURACIÓN / USUARIOS (SOLO ADMIN)
 # ------------------------------------------
 with tabs[2]:
-    if rol_actual_lower != "administrador":
+    if rol_lower != "administrador":
         st.error("⛔ Acceso denegado. Esta sección es exclusiva para el Panel de Administración.")
     else:
         st.subheader("👥 Registrar Nuevo Usuario")

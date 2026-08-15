@@ -247,11 +247,10 @@ with tabs[2]:
                                     cantidad = int(tallas_del_color.get(talla, 0))
                                     
                                     if puede_modificar:
-                                        sub1, sub2, sub3, sub4 = st.columns([1.1, 1.4, 0.9, 0.9])
+                                        sub1, sub2 = st.columns([1.2, 2.0])
                                         with sub1:
-                                            st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #4ade80;'>{talla}</span></div>", unsafe_allow_html=True)
+                                            st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #4ade80;'>{talla}</span></div>", unsafe_allow_html=True)
                                         with sub2:
-                                            # Campo de texto numérico para escribir directamente con el teclado
                                             nueva_cant = st.number_input(
                                                 f"Talla {talla}", 
                                                 min_value=0, 
@@ -264,19 +263,8 @@ with tabs[2]:
                                                 dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
                                                 supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
                                                 st.rerun()
-                                        with sub3:
-                                            if st.button("➕", key=f"sum_{item_id}_{color_sel}_{talla}"):
-                                                dict_colores[color_sel]["tallas"][talla] = cantidad + 1
-                                                supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                                                st.rerun()
-                                        with sub4:
-                                            if st.button("➖", key=f"res_{item_id}_{color_sel}_{talla}"):
-                                                if cantidad > 0:
-                                                    dict_colores[color_sel]["tallas"][talla] = cantidad - 1
-                                                    supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                                                    st.rerun()
                                     else:
-                                        st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='color: #4ade80;'>{talla}</span>: <b>{cantidad:02d}</b></div>", unsafe_allow_html=True)
+                                        st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='color: #4ade80;'>{talla}</span>: <b>{cantidad:02d}</b></div>", unsafe_allow_html=True)
                                     
                                     st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)
                 else:

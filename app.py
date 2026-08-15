@@ -142,20 +142,15 @@ with tabs[0]:
                 with st.expander("Ver detalles completos"):
                     col_info1, col_info2 = st.columns(2)
                     with col_info1:
-                        # Restringir teléfono a Recepción y Administrador
                         if st.session_state['rol'] in ["Administrador", "Recepción"]:
                             st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
-                        
                         st.write(f"**Fecha de Entrega:** {o.get('fecha_entrega', 'N/D')}")
                         st.write(f"**Tipo de Servicio:** {o.get('tipo_servicio', 'N/D')}")
-                        
                     with col_info2:
-                        # Restringir información financiera (Total, Abono, Restante) a Recepción y Administrador
                         if st.session_state['rol'] in ["Administrador", "Recepción"]:
                             st.write(f"**Total:** ${o.get('total', 0)}")
                             st.write(f"**Abono:** ${o.get('abono', 0)}")
                             st.write(f"**Restante:** ${o.get('restante', 0)}")
-                            
                     st.markdown("---")
                     st.markdown("📜 **Historial de Cambios:**")
                     try:
@@ -429,16 +424,68 @@ with tabs[3]:
             usuarios_db = supabase.table("usuarios").select("*").execute().data
             if usuarios_db:
                 for u in usuarios_db:
-                    col_u1, col_u2, col_u3 = st.columns([2, 2, 1])
+                    u_id = u.get('id')
+                    u_nombre = u.get('usuario')
+                    u_pass = u.get('password')
+                    u_rol = u.get('rol_id')
+
+                    col_u1, col_u2, col_u3, col_u4 = st.columns([2, 2, 1, 1])
                     with col_u1:
-                        st.text(f"👤 {u.get('usuario')}")
+                        st.text(f"👤 {u_nombre}")
                     with col_u2:
-                        st.text(f"Rol: {u.get('rol_id')}")
+                        st.text(f"Rol: {u_rol}")
                     with col_u3:
-                        if st.button("🗑️", key=f"del_user_{u.get('id')}"):
-                            supabase.table("usuarios").delete().eq("id", u.get('id')).execute()
+                        # Botón para desplegar/abrir la modificación en un expander o modal personalizado
+                        btn_editar = st.button("✏️ Modificar", key=f"btn_edit_user_{u_id}")
+                    with col_u4:
+                        if st.button("🗑️ Eliminar", key=f"del_user_{u_id}"):
+                            supabase.table("usuarios").delete().eq("id", u_id).execute()
                             st.success("Usuario eliminado")
                             st.rerun()
+
+                    # Sección de modificación individual para cada usuario al hacer clic en modificar
+                    if f"edit_mode_{u_id}" not in st.session_state:
+                        st.session_state[f"edit_mode_{u_id}"] = False
+
+                    if btn_editar:
+                        st.session_state[f"edit_mode_{u_id}"] = not st.session_state[f"edit_mode_{u_id}"]
+                        st.rerun()
+
+                    if st.session_state.get(f"edit_mode_{u_id}", False):
+                        with st.form(key=f"form_mod_user_{u_id}"):
+                            st.markdown(f"**Modificando a: {u_nombre}**")
+                            mod_nombre = st.text_input("Nuevo Nombre de Usuario", value=u_nombre, key=f"mod_n_{u_id}")
+                            mod_pass = st.text_input("Nueva Contraseña", value=u_pass, type="password", key=f"mod_p_{u_id}")
+                            
+                            idx_rol_actual = roles_disponibles.index(u_rol) if u_rol in roles_disponibles else 0
+                            mod_rol = st.selectbox("Nuevo Rol Asignado", roles_disponibles, index=idx_rol_actual, key=f"mod_r_{u_id}")
+                            
+                            col_sub1, col_sub2 = st.columns(2)
+                            with col_sub1:
+                                guardar_cambios = st.form_submit_button("💾 Guardar Cambios")
+                            with col_sub2:
+                                cancelar_cambios = st.form_submit_button("❌ Cancelar")
+
+                            if guardar_cambios:
+                                if mod_nombre and mod_pass:
+                                    try:
+                                        supabase.table("usuarios").update({
+                                            "usuario": mod_nombre,
+                                            "password": mod_pass,
+                                            "rol_id": mod_rol
+                                        }).eq("id", u_id).execute()
+                                        st.session_state[f"edit_mode_{u_id}"] = False
+                                        st.success("✅ Usuario actualizado correctamente.")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Error al actualizar: {e}")
+                                else:
+                                    st.warning("Completa los campos obligatorios.")
+
+                            if cancelar_cambios:
+                                st.session_state[f"edit_mode_{u_id}"] = False
+                                st.rerun()
+                    st.divider()
             else:
                 st.info("No hay usuarios adicionales registrados.")
         except Exception as e:

@@ -18,7 +18,7 @@ st.markdown("""
     div.streamlit-expanderHeader { background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; color: #f9fafb; font-weight: 600; }
     div[data-testid="stForm"] { background-color: #111827; border: 1px solid #374151; border-radius: 10px; padding: 10px; }
     p, label, span, div { color: #e5e7eb; }
-    .stButton > button { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-radius: 6px; border: none; font-weight: 600; padding: 0.2rem 0.4rem; width: 100%; min-height: 1.8rem; margin-top: 0rem; }
+    .stButton > button { border-radius: 6px; border: none; font-weight: 600; padding: 0.2rem 0.4rem; width: 100%; min-height: 1.8rem; margin-top: 0rem; }
     [data-testid="stSidebar"] { background-color: #030712; border-right: 1px solid #1f2937; }
     </style>
 """, unsafe_allow_html=True)
@@ -274,29 +274,29 @@ with tabs[2]:
 
                         st.markdown("Colores")
 
-                        # Inyectamos estilos dinámicos directamente para colorear el fondo del botón de Streamlit con el tono HEX correspondiente
+                        # Forzamos mediante CSS que cada botón tenga exactamente el color HEX de fondo registrado
                         css_botones_dinamicos = ""
                         for idx_c, c_name in enumerate(lista_cols):
                             c_hex = dict_colores[c_name].get("hex", "#3b82f6")
                             es_seleccionado = (st.session_state[key_activo] == c_name)
-                            borde_color = "3px solid #ffffff" if es_seleccionado else "2px solid #374151"
+                            borde_estilo = "3px solid #ffffff" if es_seleccionado else "1px solid rgba(255, 255, 255, 0.3)"
                             
                             css_botones_dinamicos += f"""
-                            div[data-testid="column"]:has(button#btn_col_{item_id}_{c_name}) button {{
+                            div[data-testid="column"]:has(button#btn_col_{item_id}_{idx_c}) button {{
                                 background-color: {c_hex} !important;
                                 color: #ffffff !important;
-                                border: {borde_color} !important;
+                                border: {borde_estilo} !important;
                                 font-weight: bold !important;
-                                text-shadow: 0px 1px 2px rgba(0,0,0,0.8);
+                                text-shadow: 0px 1px 2px rgba(0,0,0,0.6);
                             }}
                             """
                         st.markdown(f"<style>{css_botones_dinamicos}</style>", unsafe_allow_html=True)
 
-                        # Creamos los botones donde el mismo botón muestra el nombre y el color de fondo exacto
+                        # Renderizamos los botones con su respectivo índice numérico interno para evitar colisiones de IDs en Streamlit
                         cols_botones = st.columns(len(lista_cols))
                         for i, c_name in enumerate(lista_cols):
                             with cols_botones[i]:
-                                if st.button(c_name, key=f"btn_col_{item_id}_{c_name}", use_container_width=True):
+                                if st.button(c_name, key=f"btn_col_{item_id}_{i}", use_container_width=True):
                                     st.session_state[key_activo] = c_name
                                     st.rerun()
 

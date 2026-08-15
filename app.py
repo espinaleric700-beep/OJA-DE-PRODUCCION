@@ -97,16 +97,23 @@ mapa_roles = {
 }
 
 # ==========================================
+# VERIFICACIÓN FUERA DEL FRAGMENTO (Evita errores en Sidebar)
+# ==========================================
+try:
+    ordenes_iniciales = supabase.table("ordenes").select("*").execute().data
+    if rol_seleccionado in mapa_roles:
+        pendientes_sidebar = [o for o in ordenes_iniciales if o["estado_actual"] in mapa_roles[rol_seleccionado] and (not "Producción" in rol_seleccionado or o["area_produccion"] in rol_seleccionado)]
+        if pendientes_sidebar:
+            st.sidebar.error(f"⚠️ Tienes {len(pendientes_sidebar)} órdenes pendientes.")
+except:
+    pass
+
+# ==========================================
 # FRAGMENTO CON AUTO-REFRESCO DE DATOS (Cada 10s)
 # ==========================================
 @st.fragment(run_every=10)
 def cargar_panel_principal():
     ordenes_db = supabase.table("ordenes").select("*").execute().data
-
-    if rol_seleccionado in mapa_roles:
-        pendientes_sidebar = [o for o in ordenes_db if o["estado_actual"] in mapa_roles[rol_seleccionado] and (not "Producción" in rol_seleccionado or o["area_produccion"] in rol_seleccionado)]
-        if pendientes_sidebar:
-            st.sidebar.error(f"⚠️ Tienes {len(pendientes_sidebar)} órdenes pendientes.")
 
     st.title("🧵 Pixel Thread - Gestión de Órdenes")
     busqueda = st.text_input("🔍 Buscador rápido (Número o Cliente)")
@@ -204,7 +211,6 @@ def cargar_panel_principal():
         with tab3:
             st.subheader("👥 Gestión de Usuarios")
             
-            # --- FORMULARIO DE REGISTRO ---
             with st.expander("➕ Registrar Nuevo Usuario"):
                 n_nombre = st.text_input("Nombre Completo", key="reg_nombre")
                 n_user = st.text_input("Nombre de Usuario", key="reg_user")
@@ -216,7 +222,6 @@ def cargar_panel_principal():
                         st.warning("Completa todos los campos.")
                     else:
                         try:
-                            # Intentamos guardar incluyendo el rol (Asegúrate de tener la columna 'rol' en tu tabla 'usuarios' de Supabase)
                             supabase.table("usuarios").insert({
                                 "nombre": n_nombre,
                                 "usuario": n_user,
@@ -226,21 +231,19 @@ def cargar_panel_principal():
                             st.success("Usuario creado con éxito.")
                             st.rerun()
                         except Exception as e:
-                            # Plan B por si la columna rol aún no existe en Supabase, guarda sin el rol para que no falle
                             try:
                                 supabase.table("usuarios").insert({
                                     "nombre": n_nombre,
                                     "usuario": n_user,
                                     "password": n_pass
                                 }).execute()
-                                st.warning("Usuario creado, pero la columna 'rol' no existe en Supabase (agrégala si deseas guardarlo).")
+                                st.warning("Usuario creado, pero la columna 'rol' no existe en Supabase.")
                                 st.rerun()
                             except Exception as err:
                                 st.error(f"Error al registrar: {err}")
 
             st.markdown("---")
             
-            # --- LISTADO Y EDICIÓN/ELIMINACIÓN DE USUARIOS ---
             st.subheader("🛠️ Usuarios Existentes")
             try:
                 usuarios_lista = supabase.table("usuarios").select("*").execute().data
@@ -272,7 +275,6 @@ def cargar_panel_principal():
                                         st.success("¡Actualizado correctamente!")
                                         st.rerun()
                                     except Exception as e:
-                                        # Plan B por si la columna rol no existe
                                         supabase.table("usuarios").update({
                                             "nombre": nuevo_nombre,
                                             "usuario": nuevo_user,

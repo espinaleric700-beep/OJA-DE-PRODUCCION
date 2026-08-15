@@ -10,7 +10,7 @@ import re
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
-st_autorefresh(interval=10000, key="auto_refresh_ordenes")
+st_autorefresh(interval=15000, key="auto_refresh_ordenes")
 
 st.markdown("""
     <style>
@@ -186,8 +186,6 @@ with tabs[2]:
                     if p_tallas_str:
                         temp_data = json.loads(p_tallas_str)
                         if isinstance(temp_data, dict):
-                            # Verificar si el diccionario tiene la estructura nueva o vieja
-                            # Si la llave contiene las tallas directamente, lo migramos automáticamente
                             es_estructura_vieja = any(t in temp_data for t in tallas_disponibles)
                             if es_estructura_vieja:
                                 dict_colores = {
@@ -197,7 +195,6 @@ with tabs[2]:
                                         "hex": "#3b82f6"
                                     }
                                 }
-                                # Actualizar automáticamente en Supabase para corregirlo de forma definitiva
                                 supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
                             else:
                                 dict_colores = temp_data
@@ -208,7 +205,8 @@ with tabs[2]:
                 
                 if dict_colores:
                     lista_cols = list(dict_colores.keys())
-                    key_activo = f"color_activo_{item_id}"
+                    key_activo = f"color_activo_prod_{item_id}"
+                    
                     if key_activo not in st.session_state or st.session_state[key_activo] not in lista_cols:
                         st.session_state[key_activo] = lista_cols[0]
                     
@@ -216,7 +214,7 @@ with tabs[2]:
                     cols_colores = st.columns(min(len(lista_cols), 4))
                     for idx, c_name in enumerate(lista_cols):
                         with cols_colores[idx % len(cols_colores)]:
-                            if st.button(c_name, key=f"btn_{item_id}_{c_name}", use_container_width=True):
+                            if st.button(c_name, key=f"btn_color_item_{item_id}_{c_name}", use_container_width=True):
                                 st.session_state[key_activo] = c_name
                                 st.rerun()
                     
@@ -256,11 +254,12 @@ with tabs[2]:
                                         with sub2:
                                             st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #f3f4f6;'>{cant_str}</span></div>", unsafe_allow_html=True)
                                         with sub3:
-                                            if st.button("➕", key=f"p_{item_id}_{color_sel}_{talla}"):
+                                            # Claves totalmente únicas y blindadas por producto, color y talla
+                                            if st.button("➕", key=f"sum_{item_id}_{color_sel}_{talla}"):
                                                 dict_colores[color_sel]["tallas"][talla] = cantidad + 1
                                                 supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
                                                 st.rerun()
-                                            if st.button("➖", key=f"m_{item_id}_{color_sel}_{talla}"):
+                                            if st.button("➖", key=f"res_{item_id}_{color_sel}_{talla}"):
                                                 if cantidad > 0:
                                                     dict_colores[color_sel]["tallas"][talla] = cantidad - 1
                                                     supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
@@ -273,7 +272,7 @@ with tabs[2]:
                     st.warning("⚠️ Este producto no tiene formato de colores estructurado o contiene datos inválidos.")
 
                 if puede_modificar:
-                    if st.button("🗑️ Eliminar Producto", key=f"del_prod_{item_id}"):
+                    if st.button("🗑️ Eliminar Producto", key=f"del_prod_item_{item_id}"):
                         supabase.table("almacen").delete().eq("id", item_id).execute()
                         st.warning("⚠️ Producto eliminado.")
                         st.rerun()

@@ -1,7 +1,4 @@
 from datetime import datetime
-import os
-import firebase_admin
-from firebase_admin import credentials, storage
 import streamlit as st
 from supabase import create_client
 
@@ -19,36 +16,20 @@ SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Inicializar Firebase Storage
-@st.cache_resource
-def init_firebase():
-    if not firebase_admin._apps:
-        cred_dict = {
-            "type": st.secrets["firebase"]["type"],
-            "project_id": st.secrets["firebase"]["project_id"],
-            "private_key_id": st.secrets["firebase"]["private_key_id"],
-            "private_key": st.secrets["firebase"]["private_key"].replace("\\n", "\n"),
-            "client_email": st.secrets["firebase"]["client_email"],
-            "client_id": st.secrets["firebase"]["client_id"],
-            "auth_uri": st.secrets["firebase"]["auth_uri"],
-            "token_uri": st.secrets["firebase"]["token_uri"],
-            "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"],
-        }
-        cred = credentials.Certificate(cred_dict)
-        # Inicializamos con el nombre del bucket
-        firebase_admin.initialize_app(cred, {"storageBucket": st.secrets["firebase"]["bucket_name"]})
-
-init_firebase()
-
-def subir_a_firebase(file_bytes, file_name, folder="ordenes/"):
-    # Obtenemos la app y el bucket de forma explícita
-    app = firebase_admin.get_app()
-    bucket = storage.bucket(app=app)
-    blob = bucket.blob(f"{folder}{datetime.now().strftime('%Y%m%d%H%M%S')}_{file_name}")
-    blob.upload_from_string(file_bytes)
-    blob.make_public()
-    return blob.public_url
+def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
+    # Definir la ruta del archivo: carpeta/timestamp_nombreoriginal
+    path = f"ordenes/{datetime.now().strftime('%Y%m%d%H%M%S')}_{file_name}"
+    
+    # Subir el archivo a Supabase Storage
+    supabase.storage.from_(bucket).upload(
+        path=path,
+        file=file_bytes,
+        file_options={"content-type": "image/jpeg", "upsert": "true"}
+    )
+    
+    # Obtener la URL pública
+    url = supabase.storage.from_(bucket).get_public_url(path)
+    return url
 
 # ==========================================
 # AUTENTICACIÓN Y ROLES
@@ -94,8 +75,9 @@ with tab1:
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write(f"**Cliente:** {o['nombre_cliente']} | **Área:** {o['area_produccion']}")
+                    if o.get("archivo_diseno"):
+                        st.markdown(f"[🔗 Ver Archivo Diseño]({o['archivo_diseno']})")
                 
-                # Lógica de estados actualizada
                 estado = o["estado_actual"]
                 nuevo_estado = estado
 
@@ -126,11 +108,13 @@ with tab2:
         area_produccion = st.selectbox("Área", ["Bordados", "Impresion"])
         archivos = st.file_uploader("Diseños", accept_multiple_files=True)
         if st.form_submit_button("Crear"):
-            urls = [subir_a_firebase(f.getvalue(), f.name) for f in archivos]
+            # Usar la nueva función de Supabase
+            urls = [subir_a_supabase(f.getvalue(), f.name) for f in archivos]
             supabase.table("ordenes").insert({
                 "numero_orden": f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}",
                 "nombre_cliente": nombre_cliente, "nombre_orden": nombre_orden,
                 "area_produccion": area_produccion, "estado_actual": "Creada / Pendiente de Diseño",
                 "archivo_diseno": ",".join(urls), "creado_por": usuario
             }).execute()
+            st.success("Orden creada con éxito")
             st.rerun()

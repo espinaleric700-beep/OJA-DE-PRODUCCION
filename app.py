@@ -16,16 +16,28 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "image/jpeg", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
-# Cargar roles desde la tabla `roles` de Supabase
+# Cargar roles desde la tabla 'rol' en Supabase de forma dinámica
 try:
-    res_roles = supabase.table("roles").select("*").execute()
+    res_roles = supabase.table("rol").select("*").execute()
     roles_db = res_roles.data if res_roles.data else []
-    # Diccionario para mapear nombre -> id y viceversa
-    mapa_nombre_a_id = {r["nombre_rol"]: r["id"] for r in roles_db}
-    mapa_id_a_nombre = {r["id"]: r["nombre_rol"] for r in roles_db}
-    roles_disponibles = list(mapa_nombre_a_id.keys()) if roles_db else ["Administrador", "Recepción"]
-except:
-    roles_disponibles = ["Administrador", "Recepción", "Diseñador", "Almacén", "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"]
+    
+    roles_disponibles = [r.get("id") or r.get("nombre_rol") for r in roles_db if (r.get("id") or r.get("nombre_rol"))]
+    
+    if not roles_disponibles:
+        roles_disponibles = ["Administrador", "Recepción", "Diseñador", "Almacén", "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"]
+        
+    mapa_nombre_a_id = {r: r for r in roles_disponibles}
+    mapa_id_a_nombre = {r: r for r in roles_disponibles}
+except Exception:
+    roles_disponibles = [
+        "Administrador", 
+        "Recepción", 
+        "Diseñador", 
+        "Almacén", 
+        "Producción - Bordados", 
+        "Producción - Impresión", 
+        "Transferencia Térmica"
+    ]
     mapa_nombre_a_id = {}
     mapa_id_a_nombre = {}
 
@@ -80,7 +92,6 @@ if not st.session_state["autenticado"]:
                         st.session_state["autenticado"] = True
                         st.session_state["usuario"] = usuario_input
                         
-                        # Resolver rol por rol_id o por texto directo si existiera
                         r_id = usuario_encontrado.get("rol_id")
                         rol_nombre = mapa_id_a_nombre.get(r_id, usuario_encontrado.get("rol", rol_input))
                         st.session_state["rol"] = rol_nombre
@@ -263,15 +274,17 @@ def cargar_panel_principal():
                         st.warning("Completa todos los campos.")
                     else:
                         try:
-                            # Obtener el ID del rol seleccionado en base a la tabla roles
                             id_rol_asignado = mapa_nombre_a_id.get(n_rol)
                             
-                            supabase.table("usuarios").insert({
+                            payload = {
                                 "nombre": n_nombre,
                                 "usuario": n_user,
-                                "password": n_pass,
-                                "rol_id": id_rol_asignado
-                            }).execute()
+                                "password": n_pass
+                            }
+                            if id_rol_asignado:
+                                payload["rol_id"] = id_rol_asignado
+                            
+                            supabase.table("usuarios").insert(payload).execute()
                             st.success("Usuario creado con éxito.")
                             st.rerun()
                         except Exception as e:
@@ -286,7 +299,7 @@ def cargar_panel_principal():
                 if usuarios_lista:
                     for u in usuarios_lista:
                         r_id = u.get('rol_id')
-                        rol_actual_db = mapa_id_a_nombre.get(r_id, roles_disponibles[0])
+                        rol_actual_db = mapa_id_a_nombre.get(r_id, u.get('rol', roles_disponibles[0]))
                         if rol_actual_db not in roles_disponibles:
                             rol_actual_db = roles_disponibles[0]
                         idx_rol = roles_disponibles.index(rol_actual_db)
@@ -303,12 +316,15 @@ def cargar_panel_principal():
                                 if st.button("💾 Actualizar Usuario", key=f"btn_upd_{u['id']}"):
                                     try:
                                         nuevo_id_rol = mapa_nombre_a_id.get(nuevo_rol)
-                                        supabase.table("usuarios").update({
+                                        update_data = {
                                             "nombre": nuevo_nombre,
                                             "usuario": nuevo_user,
-                                            "password": nuevo_pass,
-                                            "rol_id": nuevo_id_rol
-                                        }).eq("id", u["id"]).execute()
+                                            "password": nuevo_pass
+                                        }
+                                        if nuevo_id_rol:
+                                            update_data["rol_id"] = nuevo_id_rol
+                                            
+                                        supabase.table("usuarios").update(update_data).eq("id", u["id"]).execute()
                                         st.success("¡Actualizado correctamente!")
                                         st.rerun()
                                     except Exception as e:

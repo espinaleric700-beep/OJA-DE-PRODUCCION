@@ -7,19 +7,26 @@ from supabase import create_client
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
-# Asegúrate de tener configurado st.secrets["supabase"]
+# Asegúrate de tener los secrets configurados en Streamlit
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Cargar roles desde la tabla 'rol'
+# Lista por defecto para evitar "No options to select"
+roles_por_defecto = [
+    "Administrador", "Recepción", "Diseñador", "Almacén", 
+    "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"
+]
+
+# Intentamos obtener roles actualizados desde la DB
+roles_disponibles = roles_por_defecto
 try:
-    res_roles = supabase.table("rol").select("*").execute()
-    roles_db = res_roles.data if res_roles.data else []
-    # Extraemos el valor de la columna 'id' que contiene los nombres de los roles
-    roles_disponibles = [r.get("id") for r in roles_db if r.get("id")]
+    res_roles = supabase.table("rol").select("id").execute()
+    if res_roles.data:
+        roles_db = [r.get("id") for r in res_roles.data if r.get("id")]
+        roles_disponibles = list(set(roles_por_defecto + roles_db))
 except Exception:
-    roles_disponibles = ["Administrador", "Recepción", "Diseñador", "Almacén", "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"]
+    pass
 
 # ==========================================
 # GESTIÓN DE SESIÓN Y AUTENTICACIÓN
@@ -32,25 +39,27 @@ if "autenticado" not in st.session_state:
 st.sidebar.title("🔐 Control de Acceso")
 
 if not st.session_state["autenticado"]:
-    usuario_input = st.sidebar.text_input("Usuario", key="input_usuario")
-    password_input = st.sidebar.text_input("Contraseña", type="password", key="input_password")
+    usuario_input = st.sidebar.text_input("Usuario")
+    password_input = st.sidebar.text_input("Contraseña", type="password")
     
     if st.sidebar.button("Iniciar Sesión"):
-        if not usuario_input or not password_input:
-            st.sidebar.warning("Por favor ingresa usuario y contraseña.")
-        else:
-            try:
-                res = supabase.table("usuarios").select("*").execute()
-                for u in res.data:
-                    if str(u.get("usuario") or "").lower() == usuario_input.strip().lower() and str(u.get("password") or "") == str(password_input):
-                        st.session_state["autenticado"] = True
-                        st.session_state["usuario"] = usuario_input
-                        # Usamos la columna 'rol' que es donde guardaremos el texto
-                        st.session_state["rol"] = u.get("rol", "")
-                        st.rerun()
+        try:
+            res = supabase.table("usuarios").select("*").execute()
+            usuario_encontrado = None
+            for u in res.data:
+                if str(u.get("usuario") or "").lower() == usuario_input.strip().lower() and str(u.get("password") or "") == str(password_input):
+                    usuario_encontrado = u
+                    break
+            
+            if usuario_encontrado:
+                st.session_state["autenticado"] = True
+                st.session_state["usuario"] = usuario_input
+                st.session_state["rol"] = usuario_encontrado.get("rol", "")
+                st.rerun()
+            else:
                 st.sidebar.error("❌ Usuario o contraseña incorrectos.")
-            except Exception as e:
-                st.sidebar.error(f"Error: {e}")
+        except Exception as e:
+            st.sidebar.error(f"Error de conexión: {e}")
     st.stop()
 
 # ==========================================
@@ -63,7 +72,7 @@ tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "⚙️ Configuración /
 
 with tabs[2]: # Pestaña de Configuración
     st.subheader("👥 Registrar Nuevo Usuario")
-    with st.form("form_reg_usuario"):
+    with st.form("form_reg_usuario", clear_on_submit=True):
         n_nombre = st.text_input("Nombre Completo")
         n_user = st.text_input("Nombre de Usuario")
         n_pass = st.text_input("Contraseña", type="password")
@@ -71,15 +80,21 @@ with tabs[2]: # Pestaña de Configuración
         
         if st.form_submit_button("Guardar Usuario"):
             try:
-                # CORRECCIÓN: Insertamos en la columna 'rol' (tipo text) 
-                # en lugar de 'rol_id' (que causaba error de tipo int4)
+                # Se inserta en la columna 'rol' (text)
                 supabase.table("usuarios").insert({
                     "nombre": n_nombre, 
                     "usuario": n_user, 
                     "password": n_pass, 
-                    "rol": n_rol 
+                    "rol": n_rol
                 }).execute()
-                st.success("Usuario creado con éxito.")
-                st.rerun()
+                st.success("✅ Usuario creado con éxito.")
             except Exception as e:
                 st.error(f"Error al registrar usuario: {e}")
+
+    st.subheader("🛠️ Usuarios Existentes")
+    try:
+        usuarios = supabase.table("usuarios").select("*").execute().data
+        for u in usuarios:
+            st.write(f"👤 **{u.get('nombre')}** | Usuario: {u.get('usuario')} | Rol: {u.get('rol')}")
+    except Exception as e:
+        st.error("No se pudieron cargar los usuarios.")

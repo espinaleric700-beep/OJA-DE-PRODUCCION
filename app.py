@@ -126,6 +126,8 @@ tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "📦 Almacén", "⚙️
 # --- Tabs ---
 with tabs[0]:
     st.subheader("📋 Listado de Órdenes")
+    
+    # Selector del filtro de estado restaurado correctamente
     filtro_estado = st.selectbox("Filtrar por Estado", ["Todos"] + lista_estados, key="filtro_estado_ordenes")
     
     try:
@@ -183,7 +185,7 @@ with tabs[0]:
                     except: st.caption("No hay historial.")
                 st.divider()
         else:
-            st.info("No hay órdenes.")
+            st.info("No hay órdenes con este filtro.")
     except Exception as e:
         st.error(f"Error: {e}")
 

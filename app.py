@@ -1,7 +1,6 @@
 from datetime import datetime
 import streamlit as st
 from supabase import create_client
-from streamlit_autorefresh import st_autorefresh
 import json
 import re
 
@@ -9,9 +8,6 @@ import re
 # CONFIGURACIÓN Y ESTILO VISUAL (MODO OSCURO)
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
-
-# Refresca la app automáticamente cada 15 segundos para ver cambios de otros usuarios
-st_autorefresh(interval=15000, key="auto_refresh_ordenes")
 
 st.markdown("""
     <style>
@@ -50,6 +46,7 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
 
 def obtener_siguiente_numero_orden():
     try:
+        st.cache_data.clear()
         res = supabase.table("ordenes").select("numero_orden").execute()
         if res.data:
             numeros = []
@@ -75,6 +72,7 @@ def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, histori
         elif isinstance(historial_actual, list): lista_historial = historial_actual
     lista_historial.insert(0, nuevo_registro)
     supabase.table("ordenes").update({"estado": nuevo_estado, "historial": json.dumps(lista_historial)}).eq("id", o_id).execute()
+    st.cache_data.clear()
 
 # Estado global inicial
 if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
@@ -91,6 +89,7 @@ if not st.session_state["autenticado"]:
             st.rerun()
         else:
             try:
+                st.cache_data.clear()
                 res = supabase.table("usuarios").select("*").execute()
                 usuario_encontrado = next((u for u in res.data if u["usuario"].lower() == usuario_input.lower() and u["password"] == password_input), None)
                 if usuario_encontrado:
@@ -116,6 +115,7 @@ with tabs[0]:
         filtro_estado = st.selectbox("Filtrar por Estado", ["Todos"] + lista_estados, key="filtro_estado_ordenes")
     
     try:
+        st.cache_data.clear()
         query_ordenes = supabase.table("ordenes").select("*")
         if filtro_estado != "Todos": query_ordenes = query_ordenes.eq("estado", filtro_estado)
         ordenes = query_ordenes.execute().data
@@ -190,6 +190,7 @@ with tabs[1]:
                 "abono": abono_orden, "restante": total_orden - abono_orden, "observaciones": observaciones,
                 "estado": "Pendiente", "historial": historial_inicial
             }).execute()
+            st.cache_data.clear()
             st.success("¡Orden creada!")
             st.rerun()
 
@@ -273,15 +274,14 @@ with tabs[2]:
                         }).execute()
                         
                         st.session_state["colores_inventario_avanzado"] = {}
+                        st.cache_data.clear()
                         st.success("✅ ¡Producto guardado con éxito!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar producto: {e}")
         st.divider()
 
-    # --- FORZAR LECTURA DE DATOS FRESCOS ---
     try:
-        # Esto limpia cualquier caché previa para asegurar que siempre traiga datos de Supabase
         st.cache_data.clear()
         response = supabase.table("almacen").select("*").execute()
         inventario_db = response.data
@@ -308,6 +308,7 @@ with tabs[2]:
                                     }
                                 }
                                 supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                st.cache_data.clear()
                             else:
                                 dict_colores = temp_data
                 except Exception:
@@ -362,12 +363,12 @@ with tabs[2]:
                                         with sub1:
                                             st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #4ade80;'>{talla}</span></div>", unsafe_allow_html=True)
                                         with sub2:
-                                            # Al cambiar el input, guardamos y recargamos instantáneamente
                                             nueva_cant = st.number_input(f"Talla {talla}", min_value=0, step=1, value=cantidad, key=f"num_{item_id}_{color_sel}_{talla}", label_visibility="collapsed")
                                             if nueva_cant != cantidad:
                                                 dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
                                                 supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                                                st.rerun() # Esto recarga toda la página y obliga a traer los datos nuevos
+                                                st.cache_data.clear()
+                                                st.rerun()
                                     else:
                                         st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='color: #4ade80;'>{talla}</span>: <b>{cantidad:02d}</b></div>", unsafe_allow_html=True)
                                     st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)
@@ -383,6 +384,7 @@ with tabs[2]:
                                     url_subida = subir_a_supabase(nueva_img_file.getvalue(), nueva_img_file.name)
                                     dict_colores[color_sel]["imagen_url"] = url_subida
                                     supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                    st.cache_data.clear()
                                     st.success("✅ ¡Imagen actualizada!")
                                     st.rerun()
                                 except Exception as e:
@@ -392,6 +394,7 @@ with tabs[2]:
                         
                         if st.button("🗑️ Eliminar Producto Completo", key=f"del_prod_item_{item_id}"):
                             supabase.table("almacen").delete().eq("id", item_id).execute()
+                            st.cache_data.clear()
                             st.warning("⚠️ Producto eliminado.")
                             st.rerun()
                 st.divider()
@@ -416,6 +419,7 @@ with tabs[3]:
                             "password": nuevo_pass,
                             "rol_id": nuevo_rol
                         }).execute()
+                        st.cache_data.clear()
                         st.success("✅ Usuario creado exitosamente.")
                         st.rerun()
                     except Exception as e:
@@ -426,6 +430,7 @@ with tabs[3]:
         st.markdown("---")
         st.subheader("Lista de Usuarios Registrados")
         try:
+            st.cache_data.clear()
             usuarios_db = supabase.table("usuarios").select("*").execute().data
             if usuarios_db:
                 for u in usuarios_db:
@@ -444,6 +449,7 @@ with tabs[3]:
                     with col_u4:
                         if st.button("🗑️ Eliminar", key=f"del_user_{u_id}"):
                             supabase.table("usuarios").delete().eq("id", u_id).execute()
+                            st.cache_data.clear()
                             st.success("Usuario eliminado")
                             st.rerun()
 
@@ -477,6 +483,7 @@ with tabs[3]:
                                             "password": mod_pass,
                                             "rol_id": mod_rol
                                         }).eq("id", u_id).execute()
+                                        st.cache_data.clear()
                                         st.session_state[f"edit_mode_{u_id}"] = False
                                         st.success("✅ Usuario actualizado correctamente.")
                                         st.rerun()

@@ -88,38 +88,36 @@ with tabs[0]:
                         )
                         
                         if st.form_submit_button("💾 Actualizar y Registrar Cambio"):
-                            # 1. Actualizar estado en la tabla de órdenes
+                            fecha_hora_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+                            usuario_actual = st.session_state['usuario']
+                            
+                            # Crear el texto del nuevo movimiento
+                            nuevo_registro = f"• Estado: **{nuevo_estado}** | Usuario: `{usuario_actual}` | Fecha: {fecha_hora_str}"
+                            
+                            # Obtener historial anterior si existe y acumularlo
+                            historial_previo = o.get('historial') or ""
+                            historial_actualizado = f"{nuevo_registro}\n{historial_previo}" if historial_previo else nuevo_registro
+                            
+                            # Actualizar en la misma tabla de órdenes (evita errores de tablas secundarias)
                             supabase.table("ordenes").update({
                                 "estado": nuevo_estado, 
-                                "estado_actual": nuevo_estado
+                                "estado_actual": nuevo_estado,
+                                "historial": historial_actualizado
                             }).eq("id", o.get("id")).execute()
                             
-                            # 2. Registrar en el historial de cambios
-                            supabase.table("historial_ordenes").insert({
-                                "orden_id": str(o.get('id')),
-                                "nuevo_estado": nuevo_estado,
-                                "usuario_que_cambio": st.session_state['usuario'],
-                                "fecha_hora": datetime.now().isoformat()
-                            }).execute()
-                            
-                            st.success("✅ Estado actualizado y registrado correctamente.")
+                            st.success("✅ Estado actualizado correctamente.")
                             st.rerun()
 
                     if o.get('factura_url'):
                         st.markdown(f"📄 [Ver Factura]({o.get('factura_url')})")
 
-                    # 3. Desplegable con el historial de cambios
+                    # 3. Desplegable con el historial acumulado
                     with st.expander("🕒 Ver historial de cambios de estado"):
-                        try:
-                            historial = supabase.table("historial_ordenes").select("*").eq("orden_id", str(o.get('id'))).order("fecha_hora", desc=True).execute().data
-                            if historial:
-                                for h in historial:
-                                    fecha_formateada = h['fecha_hora'][:16].replace('T', ' ') if h.get('fecha_hora') else 'N/A'
-                                    st.write(f"- **{h.get('nuevo_estado')}** | Modificado por: `{h.get('usuario_que_cambio')}` | Fecha: {fecha_formateada}")
-                            else:
-                                st.info("No hay cambios registrados en el historial para esta orden.")
-                        except Exception as e:
-                            st.warning("No se pudo cargar el historial (verifica que la tabla 'historial_ordenes' exista en Supabase).")
+                        historial_texto = o.get('historial')
+                        if historial_texto:
+                            st.markdown(historial_texto)
+                        else:
+                            st.info("No hay cambios registrados en el historial para esta orden.")
         else:
             st.info("No hay órdenes registradas.")
     except Exception as e:
@@ -147,7 +145,8 @@ with tabs[1]:
                     "area_produccion": area,
                     "imagen_url": ",".join(urls),
                     "estado": "Pendiente",
-                    "estado_actual": "Pendiente"
+                    "estado_actual": "Pendiente",
+                    "historial": f"• Creada como **Pendiente** | Usuario: `{st.session_state['usuario']}` | Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
                 }).execute()
                 st.success("✅ Orden creada con éxito.")
             except Exception as e:

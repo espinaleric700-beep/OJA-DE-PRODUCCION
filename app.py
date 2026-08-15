@@ -26,11 +26,11 @@ if "autenticado" not in st.session_state:
 
 st.sidebar.title("🔐 Control de Acceso")
 
+roles_disponibles = ["Administrador", "Recepción", "Diseñador", "Almacén", "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"]
+
 if not st.session_state["autenticado"]:
     usuario_input = st.sidebar.text_input("Usuario", key="input_usuario")
     password_input = st.sidebar.text_input("Contraseña", type="password", key="input_password")
-    
-    roles_disponibles = ["Administrador", "Recepción", "Diseñador", "Almacén", "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"]
     rol_input = st.sidebar.selectbox("Rol", roles_disponibles, key="input_rol")
     
     if rol_input == "Administrador":
@@ -206,24 +206,37 @@ def cargar_panel_principal():
             
             # --- FORMULARIO DE REGISTRO ---
             with st.expander("➕ Registrar Nuevo Usuario"):
-                n_nombre = st.text_input("Nombre Completo")
-                n_user = st.text_input("Nombre de Usuario")
-                n_pass = st.text_input("Contraseña", type="password")
+                n_nombre = st.text_input("Nombre Completo", key="reg_nombre")
+                n_user = st.text_input("Nombre de Usuario", key="reg_user")
+                n_pass = st.text_input("Contraseña", type="password", key="reg_pass")
+                n_rol = st.selectbox("Rol Asignado", roles_disponibles, key="reg_rol")
                 
                 if st.button("Guardar Usuario"):
                     if not n_nombre or not n_user or not n_pass:
                         st.warning("Completa todos los campos.")
                     else:
                         try:
+                            # Intentamos guardar incluyendo el rol (Asegúrate de tener la columna 'rol' en tu tabla 'usuarios' de Supabase)
                             supabase.table("usuarios").insert({
                                 "nombre": n_nombre,
                                 "usuario": n_user,
-                                "password": n_pass
+                                "password": n_pass,
+                                "rol": n_rol
                             }).execute()
                             st.success("Usuario creado con éxito.")
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Error al registrar: {e}")
+                            # Plan B por si la columna rol aún no existe en Supabase, guarda sin el rol para que no falle
+                            try:
+                                supabase.table("usuarios").insert({
+                                    "nombre": n_nombre,
+                                    "usuario": n_user,
+                                    "password": n_pass
+                                }).execute()
+                                st.warning("Usuario creado, pero la columna 'rol' no existe en Supabase (agrégala si deseas guardarlo).")
+                                st.rerun()
+                            except Exception as err:
+                                st.error(f"Error al registrar: {err}")
 
             st.markdown("---")
             
@@ -234,22 +247,39 @@ def cargar_panel_principal():
                 
                 if usuarios_lista:
                     for u in usuarios_lista:
-                        with st.expander(f"👤 {u.get('nombre', 'Sin nombre')} ({u.get('usuario', '')})"):
+                        rol_actual_db = u.get('rol', 'Administrador')
+                        if rol_actual_db not in roles_disponibles:
+                            rol_actual_db = roles_disponibles[0]
+                        idx_rol = roles_disponibles.index(rol_actual_db)
+
+                        with st.expander(f"👤 {u.get('nombre', 'Sin nombre')} ({u.get('usuario', '')}) - Rol: {u.get('rol', 'No especificado')}"):
                             col1, col2 = st.columns(2)
                             
                             with col1:
                                 nuevo_nombre = st.text_input("Nombre", value=u.get('nombre', ''), key=f"edit_n_{u['id']}")
                                 nuevo_user = st.text_input("Usuario", value=u.get('usuario', ''), key=f"edit_u_{u['id']}")
                                 nuevo_pass = st.text_input("Contraseña", value=u.get('password', ''), type="password", key=f"edit_p_{u['id']}")
+                                nuevo_rol = st.selectbox("Rol", roles_disponibles, index=idx_rol, key=f"edit_r_{u['id']}")
                                 
                                 if st.button("💾 Actualizar Usuario", key=f"btn_upd_{u['id']}"):
-                                    supabase.table("usuarios").update({
-                                        "nombre": nuevo_nombre,
-                                        "usuario": nuevo_user,
-                                        "password": nuevo_pass
-                                    }).eq("id", u["id"]).execute()
-                                    st.success("¡Actualizado correctamente!")
-                                    st.rerun()
+                                    try:
+                                        supabase.table("usuarios").update({
+                                            "nombre": nuevo_nombre,
+                                            "usuario": nuevo_user,
+                                            "password": nuevo_pass,
+                                            "rol": nuevo_rol
+                                        }).eq("id", u["id"]).execute()
+                                        st.success("¡Actualizado correctamente!")
+                                        st.rerun()
+                                    except Exception as e:
+                                        # Plan B por si la columna rol no existe
+                                        supabase.table("usuarios").update({
+                                            "nombre": nuevo_nombre,
+                                            "usuario": nuevo_user,
+                                            "password": nuevo_pass
+                                        }).eq("id", u["id"]).execute()
+                                        st.warning("Actualizado (la columna 'rol' no existe en Supabase).")
+                                        st.rerun()
                             
                             with col2:
                                 st.write("###") 

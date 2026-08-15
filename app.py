@@ -7,52 +7,57 @@ from supabase import create_client
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
-# CSS personalizado para diseño profesional de fondo oscuro
+# CSS personalizado para diseño profesional de fondo oscuro, tipografía nítida y estados a color
 st.markdown("""
     <style>
     /* Fondo principal y textos */
     .stApp {
-        background-color: #0e1117;
-        color: #fafafa;
+        background-color: #0b0f19;
+        color: #f3f4f6;
     }
     
-    /* Contenedores y expanders */
+    /* Contenedores y expanders generales */
     div.streamlit-expanderHeader {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: #111827;
+        border: 1px solid #1f2937;
         border-radius: 8px;
-        color: #c9d1d9;
+        color: #f9fafb;
+        font-weight: 600;
     }
     
     /* Tarjetas y bloques de formularios */
     div[data-testid="stForm"] {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: #111827;
+        border: 1px solid #374151;
         border-radius: 10px;
         padding: 20px;
     }
     
-    /* Inputs y selectores */
-    stTextInput, stSelectbox, stMultiSelect {
-        color: #fafafa;
+    /* Etiquetas y textos generales */
+    p, label, span, div {
+        color: #e5e7eb;
     }
     
-    /* Botones principales */
+    /* Botones principales llamativos */
     .stButton > button {
-        background-color: #238636;
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
         color: white;
-        border-radius: 6px;
+        border-radius: 8px;
         border: none;
         font-weight: 600;
+        padding: 0.5rem 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        transition: all 0.3s ease;
     }
     .stButton > button:hover {
-        background-color: #2ea043;
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+        box-shadow: 0 6px 8px -1px rgba(59, 130, 246, 0.4);
     }
     
     /* Sidebar */
     [data-testid="stSidebar"] {
-        background-color: #010409;
-        border-right: 1px solid #30363d;
+        background-color: #030712;
+        border-right: 1px solid #1f2937;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -125,7 +130,17 @@ with tabs[0]:
             for o in ordenes_a_mostrar:
                 estado_actual = o.get('estado') or o.get('estado_actual') or 'Pendiente'
                 
-                with st.expander(f"Orden #{o.get('numero_orden', 'N/A')} - Cliente: {o.get('nombre_cliente', 'N/A')} | Estado: {estado_actual}"):
+                # Asignación de colores distintivos según el estado de la orden
+                color_map = {
+                    "Pendiente": "🟡",
+                    "Enviado a Recepción": "🔵",
+                    "En Producción": "🟠",
+                    "Regresado a Recepción": "🟣",
+                    "Orden Entregada": "🟢"
+                }
+                icono_estado = color_map.get(estado_actual, "⚪")
+                
+                with st.expander(f"{icono_estado} Orden #{o.get('numero_orden', 'N/A')} - Cliente: {o.get('nombre_cliente', 'N/A')} | Estado: {estado_actual}"):
                     st.write(f"**Área:** {o.get('area_produccion', 'N/A')} | **Detalles:** {o.get('nombre_orden', 'N/A')}")
                     
                     # Formulario para actualizar estado

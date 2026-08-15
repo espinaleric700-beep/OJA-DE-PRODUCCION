@@ -129,6 +129,28 @@ def cargar_panel_principal():
                 if o["estado_actual"] in ["Cancelado", "Entregado"]: 
                     continue
                 
+                # FILTRAR POR ÁREA / ROL: Si no es Administrador, validar si la orden pertenece a su área o estado asignado
+                if rol_seleccionado != "Administrador":
+                    estado_actual = o["estado_actual"]
+                    area_prod = o["area_produccion"]
+                    
+                    visible = False
+                    if rol_seleccionado == "Recepción" and estado_actual in ["Creada / Pendiente de Diseño", "Enviado a Transferencia Térmica"]:
+                        visible = True
+                    elif rol_seleccionado == "Diseñador" and estado_actual == "Creada / Pendiente de Diseño":
+                        visible = True
+                    elif rol_seleccionado == "Almacén" and estado_actual == "Enviado a Recepción":
+                        visible = True
+                    elif rol_seleccionado == "Producción - Bordados" and estado_actual == "En Producción" and area_prod == "Bordados":
+                        visible = True
+                    elif rol_seleccionado == "Producción - Impresión" and estado_actual == "En Producción" and area_prod == "Impresion":
+                        visible = True
+                    elif rol_seleccionado == "Transferencia Térmica" and estado_actual == "Enviado a Transferencia Térmica":
+                        visible = True
+                    
+                    if not visible:
+                        continue
+
                 if busqueda and (busqueda.lower() not in o.get("numero_orden", "").lower() and busqueda.lower() not in o.get("nombre_cliente", "").lower()):
                     continue
 
@@ -193,7 +215,7 @@ def cargar_panel_principal():
 
     with tab2:
         if rol_seleccionado in ROLES_AUTORIZADOS_CREAR:
-            with st.form("form_nueva_orden"):
+            with st.form("form_nueva_orden", clear_on_submit=True):
                 nombre_cliente = st.text_input("Cliente")
                 nombre_orden = st.text_input("Nombre de la Orden")
                 area = st.selectbox("Área", ["Bordados", "Impresion"])
@@ -208,8 +230,7 @@ def cargar_panel_principal():
                         "area_produccion": area, "fecha_entrega": str(fecha),
                         "estado_actual": "Creada / Pendiente de Diseño", "archivo_diseno": ",".join(urls), "creado_por": usuario
                     }).execute()
-                    st.success(f"Orden {num} creada con éxito")
-                    st.rerun()
+                    st.success(f"✅ ¡Orden {num} creada y enviada con éxito!")
         else:
             st.error("⚠️ No tienes permisos para crear o modificar órdenes.")
 

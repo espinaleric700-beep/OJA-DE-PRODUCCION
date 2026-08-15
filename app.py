@@ -1,5 +1,6 @@
 from datetime import datetime
 import streamlit as st
+import streamlit.components.v1 as components
 from supabase import create_client
 from streamlit_autorefresh import st_autorefresh
 import json
@@ -276,25 +277,29 @@ with tabs[2]:
 
                         st.markdown("Colores")
                         
-                        # Generar botones en HTML puro con diseño de círculos compactos y pegados uno al lado del otro
-                        botones_html = '<div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">'
+                        # Construir el contenedor HTML completo de manera segura usando components.html
+                        componentes_html = f'''
+                        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">
+                        '''
+                        
                         for col_name in lista_cols:
                             info_col = dict_colores[col_name]
                             color_hex = info_col.get("hex", "#3b82f6") if isinstance(info_col, dict) else "#3b82f6"
                             es_seleccionado = (color_seleccionado_ver == col_name)
                             
-                            # Estilo del anillo doble si está seleccionado
                             borde_estilo = "box-shadow: 0 0 0 2px #0b0f19, 0 0 0 4px #3b82f6, inset 0 0 0 3px #ffffff;" if es_seleccionado else "box-shadow: inset 0 0 0 3px #ffffff, 0 2px 4px rgba(0,0,0,0.3);"
                             
-                            botones_html += f'''
-                                <button onclick="window.location.href='?item_{item_id}={col_name}'" 
+                            componentes_html += f'''
+                                <button onclick="window.parent.location.href='?item_{item_id}={col_name}'" 
                                         title="{col_name}"
                                         style="background-color: {color_hex}; width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer; {borde_estilo} transition: transform 0.1s ease;">
                                 </button>
                             '''
-                        botones_html += '</div>'
                         
-                        st.markdown(botones_html, unsafe_allow_html=True)
+                        componentes_html += '</div>'
+                        
+                        # Renderizar usando el componente HTML nativo de Streamlit
+                        components.html(componentes_html, height=50)
 
                         # Capturar parámetro por URL para cambio de estado inmediato sin recargas complejas de columnas
                         params = st.query_params

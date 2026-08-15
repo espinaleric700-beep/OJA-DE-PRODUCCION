@@ -114,27 +114,44 @@ with tabs[0]:
                 cliente_o = o.get('nombre_cliente', 'Sin cliente')
                 estado_actual = o.get('estado', 'Pendiente')
                 
-                with st.expander(f"Orden #{numero_o} - {cliente_o} [Estado: {estado_actual}]"):
-                    # Solo mostrar datos del cliente y pagos si es Administrador o Recepción
-                    if st.session_state['rol'] in ["Administrador", "Recepción"]:
-                        col_info1, col_info2 = st.columns(2)
-                        with col_info1:
-                            st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
-                            st.write(f"**Fecha de Entrega:** {o.get('fecha_entrega', 'N/D')}")
-                            st.write(f"**Tipo de Servicio:** {o.get('tipo_servicio', 'N/D')}")
-                        with col_info2:
-                            st.write(f"**Total:** ${o.get('total', 0)}")
-                            st.write(f"**Abono:** ${o.get('abono', 0)}")
-                            st.write(f"**Restante:** ${o.get('restante', 0)}")
-                        st.markdown("---")
-                    
-                    nuevo_estado_sel = st.selectbox("Cambiar Estado de la Orden", lista_estados, index=lista_estados.index(estado_actual) if estado_actual in lista_estados else 0, key=f"select_est_{o_id}")
-                    
-                    if nuevo_estado_sel != estado_actual:
-                        if st.button("💾 Actualizar Estado", key=f"btn_upd_est_{o_id}"):
-                            supabase.table("ordenes").update({"estado": nuevo_estado_sel}).eq("id", o_id).execute()
-                            st.success("✅ ¡Estado actualizado!")
-                            st.rerun()
+                # Diseño de columnas en la interfaz para integrar el selector rápido a la derecha del expander
+                col_exp, col_select = st.columns([3.5, 1.5])
+                
+                with col_select:
+                    idx_actual = lista_estados.index(estado_actual) if estado_actual in lista_estados else 0
+                    nuevo_estado_rapido = st.selectbox(
+                        "Estado rápido", 
+                        lista_estados, 
+                        index=idx_actual, 
+                        key=f"quick_est_{o_id}", 
+                        label_visibility="collapsed"
+                    )
+                    if nuevo_estado_rapido != estado_actual:
+                        supabase.table("ordenes").update({"estado": nuevo_estado_rapido}).eq("id", o_id).execute()
+                        st.rerun()
+
+                with col_exp:
+                    with st.expander(f"Orden #{numero_o} - {cliente_o}"):
+                        # Solo mostrar datos del cliente y pagos si es Administrador o Recepción
+                        if st.session_state['rol'] in ["Administrador", "Recepción"]:
+                            col_info1, col_info2 = st.columns(2)
+                            with col_info1:
+                                st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
+                                st.write(f"**Fecha de Entrega:** {o.get('fecha_entrega', 'N/D')}")
+                                st.write(f"**Tipo de Servicio:** {o.get('tipo_servicio', 'N/D')}")
+                            with col_info2:
+                                st.write(f"**Total:** ${o.get('total', 0)}")
+                                st.write(f"**Abono:** ${o.get('abono', 0)}")
+                                st.write(f"**Restante:** ${o.get('restante', 0)}")
+                            st.markdown("---")
+                        
+                        nuevo_estado_sel = st.selectbox("Cambiar Estado de la Orden", lista_estados, index=lista_estados.index(estado_actual) if estado_actual in lista_estados else 0, key=f"select_est_{o_id}")
+                        
+                        if nuevo_estado_sel != estado_actual:
+                            if st.button("💾 Actualizar Estado", key=f"btn_upd_est_{o_id}"):
+                                supabase.table("ordenes").update({"estado": nuevo_estado_sel}).eq("id", o_id).execute()
+                                st.success("✅ ¡Estado actualizado!")
+                                st.rerun()
         else:
             st.info("No hay órdenes registradas con este filtro.")
     except Exception as e:

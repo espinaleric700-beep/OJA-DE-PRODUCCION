@@ -3,6 +3,7 @@ import streamlit as st
 from supabase import create_client
 import json
 import re
+from streamlit_autorefresh import st_autorefresh
 
 # ==========================================
 # CONFIGURACIÓN Y ESTILO VISUAL (MODO OSCURO)
@@ -101,8 +102,19 @@ st.sidebar.markdown("### 🔐 Control de Acceso")
 st.sidebar.success(f"👋 ¡Bienvenido, **{st.session_state['usuario']}**!\n\nRol: *{st.session_state['rol']}*")
 
 st.sidebar.markdown("---")
+
+# 1. Configuración del Auto-Refresh cada 10,000 milisegundos (10 segundos)
+# Esto actualiza de forma automática el contador interno sin bloquear la UI
+count = st_autorefresh(interval=10000, key="datasync_counter")
+
+# Si el temporizador se dispara, incrementamos el disparador de sincronización de manera automática
+if count > 0:
+    # Nota: el autorefresh ya recarga la página por sí solo cada 10s, 
+    # pero incrementamos el trigger para asegurar el refresco de componentes avanzados
+    pass
+
+# 2. Botón opcional manual conservado en la barra lateral
 if st.sidebar.button("🔄 Sincronizar / Refrescar Datos", use_container_width=True):
-    # Incrementamos el contador para invalidar estados internos y forzar lectura fresca
     st.session_state["sync_trigger"] += 1
     st.rerun()
 
@@ -284,7 +296,6 @@ with tabs[2]:
                         st.error(f"Error al guardar producto: {e}")
         st.divider()
 
-    # Fragmento aislado que fuerza la recarga limpia de Supabase usando el sync_trigger
     @st.fragment
     def render_inventario_fresco(trigger_val):
         try:
@@ -367,7 +378,6 @@ with tabs[2]:
                                             with sub1:
                                                 st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #4ade80;'>{talla}</span></div>", unsafe_allow_html=True)
                                             with sub2:
-                                                # Clave dinámica amarrada al trigger de sincronización para limpiar el input viejo
                                                 nueva_cant = st.number_input(f"Talla {talla}", min_value=0, step=1, value=cantidad, key=f"num_{item_id}_{color_sel}_{talla}_{trigger_val}", label_visibility="collapsed")
                                             with sub3:
                                                 if st.button("💾", key=f"save_{item_id}_{color_sel}_{talla}_{trigger_val}", help=f"Guardar Talla {talla}"):

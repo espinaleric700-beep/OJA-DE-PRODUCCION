@@ -20,6 +20,28 @@ st.markdown("""
     p, label, span, div { color: #e5e7eb; }
     .stButton > button { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-radius: 6px; border: none; font-weight: 600; padding: 0.2rem 0.4rem; width: 100%; min-height: 1.8rem; margin-top: 0rem; }
     [data-testid="stSidebar"] { background-color: #030712; border-right: 1px solid #1f2937; }
+
+    /* Estilos para transformar st.pills en círculos de colores */
+    [data-testid="stPills"] {
+        display: flex;
+        gap: 12px;
+    }
+    [data-testid="stPills"] button {
+        width: 40px !important;
+        height: 40px !important;
+        border-radius: 50% !important;
+        padding: 0 !important;
+        border: 2px solid #374151 !important;
+        color: transparent !important; /* Oculta el texto para mostrar solo el círculo de color */
+        font-size: 0px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    [data-testid="stPills"] button[aria-selected="true"] {
+        border-color: #60a5fa !important;
+        transform: scale(1.15);
+        box-shadow: 0 0 10px rgba(96, 165, 250, 0.6);
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -273,8 +295,18 @@ with tabs[2]:
                             st.session_state[key_pills] = lista_cols[0]
 
                         st.markdown("Colores")
+
+                        # Generar estilos dinámicos para pintar cada píldora circular con su respectivo código HEX guardado
+                        css_pills_custom = ""
+                        for idx_c, c_name in enumerate(lista_cols):
+                            c_hex = dict_colores[c_name].get("hex", "#3b82f6")
+                            css_pills_custom += f"""
+                            div[data-testid="stPills"] button:nth-child({idx_c + 1}) {{
+                                background-color: {c_hex} !important;
+                            }}
+                            """
+                        st.markdown(f"<style>{css_pills_custom}</style>", unsafe_allow_html=True)
                         
-                        # Usando st.pills nativo de Streamlit para una respuesta instantánea y perfectamente sincronizada
                         color_seleccionado_ver = st.pills(
                             "Colores disponibles", 
                             lista_cols, 

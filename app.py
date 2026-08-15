@@ -71,6 +71,7 @@ roles_disponibles = [
     "Almacén",
     "Producción - Bordados",
     "Producción - Impresión",
+    "Transferencia Térmica",
 ]
 rol_seleccionado = st.sidebar.selectbox("Rol", roles_disponibles)
 
@@ -192,10 +193,10 @@ with tab1:
             ):
               nuevo_estado = "Enviado a transferencia térmica"
 
-        elif (
-            estado == "Enviado a transferencia térmica"
-            and rol_seleccionado in ["Administrador", "Producción - Impresión"]
-        ):
+        elif estado == "Enviado a transferencia térmica" and rol_seleccionado in [
+            "Administrador",
+            "Transferencia Térmica",
+        ]:
           if st.button(
               "🟢 Avanzar: Enviado a Recepción", key=f"btn_term_{o['id']}"
           ):
@@ -307,7 +308,6 @@ with tab3:
         "Solo el Administrador puede gestionar usuarios y roles."
     )
   else:
-    # Sección para registrar nuevo usuario
     with st.expander("➕ Registrar Nuevo Usuario"):
       with st.form("form_nuevo_usuario"):
         nuevo_nombre = st.text_input("Nombre Completo del Empleado")

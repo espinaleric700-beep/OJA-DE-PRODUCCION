@@ -41,7 +41,6 @@ if not st.session_state["autenticado"]:
     if st.sidebar.button("Iniciar Sesión"):
         if not usuario_input or not password_input:
             st.sidebar.warning("Por favor ingresa usuario y contraseña.")
-        # Acceso maestro directo para el Administrador con la clave maestra
         elif rol_input == "Administrador" and usuario_input.strip().lower() == "admin" and password_input == "2580Admin" and clave_admin == "2580Admin":
             st.session_state["autenticado"] = True
             st.session_state["usuario"] = "admin"
@@ -207,7 +206,8 @@ def cargar_panel_principal():
             n_pass = st.text_input("Contraseña", type="password")
             n_rol = st.selectbox("Rol", tab3_roles_disponibles, key="sel_rol_n")
             if st.button("Registrar Usuario"):
-                supabase.table("usuarios").insert({"usuario": n_user, "password": n_pass, "rol": n_rol}).execute()
+                # Se eliminó la columna "rol" de la inserción para evitar errores con la base de datos actual
+                supabase.table("usuarios").insert({"usuario": n_user, "password": n_pass}).execute()
                 st.success("Registrado con éxito")
             
             st.markdown("---")

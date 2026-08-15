@@ -13,7 +13,6 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     path = f"ordenes/{datetime.now().strftime('%Y%m%d%H%M%S')}_{file_name}"
-    # Usamos content-type genérico para admitir formatos de diseño pesados
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
@@ -88,50 +87,98 @@ rol_actual = str(st.session_state.get("rol", "")).strip()
 rol_lower = rol_actual.lower()
 
 # ------------------------------------------
-# TAB 0: VER ÓRDENES Y CAMBIAR ESTADOS
+# TAB 0: VER ÓRDENES Y FLUJO DE ESTADOS
 # ------------------------------------------
 with tabs[0]:
     st.subheader("📋 Listado y Control de Órdenes")
     try:
         ordenes = supabase.table("ordenes").select("*").execute().data
         if ordenes:
-            estados_posibles = ["Pendiente", "En Proceso", "Completado", "Entregado"]
-            
             for o in ordenes:
                 area_orden = o.get('area', 'General')
+                estado_actual = o.get('estado', 'Pendiente')
                 
-                # Determinamos si el usuario actual tiene permiso para modificar esta orden específica
-                # El Admin y Diseñador pueden ver y modificar todo. Los demás solo lo de su área respectiva.
-                es_admin_o_disenador = rol_lower in ["administrador", "diseñador"]
-                es_su_area = (rol_lower == "producción - bordados" and area_orden == "Bordado") or \
-                             (rol_lower == "producción - impresión" and area_orden == "Impresión")
-                
-                puede_modificar = es_admin_o_disenador or es_su_area
-                
-                with st.expander(f"Orden #{o.get('id', 'N/A')} - Cliente: {o.get('cliente', 'General')} | Área: [{area_orden}] - Estado: {o.get('estado', 'Pendiente')}"):
+                with st.expander(f"Orden #{o.get('id', 'N/A')} - Cliente: {o.get('cliente', 'General')} | Área: [{area_orden}] - Estado: {estado_actual}"):
                     st.write(f"**Área de Trabajo:** {area_orden}")
                     st.write(f"**Detalles:** {o.get('detalles', 'Sin detalles')}")
                     st.write(f"**Fecha de Creación:** {o.get('fecha', 'N/A')}")
+                    st.write(f"📌 **Estado Actual:** {estado_actual}")
                     
-                    estado_actual = o.get('estado', 'Pendiente')
+                    # Botones de cambio de estado basados en roles y flujo solicitado:
                     
-                    if puede_modificar:
-                        nuevo_estado = st.selectbox(
-                            "Actualizar Estado de la Orden",
-                            estados_posibles,
-                            index=estados_posibles.index(estado_actual) if estado_actual in estados_posibles else 0,
-                            key=f"estado_{o.get('id')}"
-                        )
-                        if st.button("Guardar Cambios de Estado", key=f"btn_{o.get('id')}"):
+                    # 1. Rol Diseñador: Puede enviar a recepción
+                    if rol_lower == "diseñador" and estado_actual == "Pendiente":
+                        if st.button("📤 Enviar a Recepción", key=f"btn_dis_{o.get('id')}"):
                             try:
-                                supabase.table("ordenes").update({"estado": nuevo_estado}).eq("id", o.get("id")).execute()
-                                st.success("✅ Estado actualizado correctamente.")
+                                supabase.table("ordenes").update({"estado": "Enviado a Recepción"}).eq("id", o.get("id")).execute()
+                                st.success("✅ Orden enviada a recepción.")
                                 st.rerun()
                             except Exception as ex:
-                                st.error(f"Error al actualizar estado: {ex}")
-                    else:
-                        st.info(f"📌 Estado actual: **{estado_actual}** (Solo lectura para tu rol actual)")
+                                st.error(f"Error: {ex}")
 
+                    # 2. Roles de Producción y Almacén: Enviar a producción / marcar listo / completado
+                    es_produccion_area = (rol_lower == "producción - bordados" and area_orden == "Bordado") or \
+                                         (rol_lower == "producción - impresión" and area_orden == "Impresión")
+                    es_almacen = rol_lower == "almacén" or rol_lower == "almacen"
+
+                    if es_produccion_area or es_almacen:
+                        if estado_actual in ["Enviado a Recepción", "Pendiente"]:
+                            if st.button("🚀 Enviar a Producción", key=f"btn_prod_{o.get('id')}"):
+                                try:
+                                    supabase.table("ordenes").update({"estado": "En Producción"}).eq("id", o.get("id")).execute()
+                                    st.success("✅ Orden enviada a producción.")
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Error: {ex}")
+
+                        if estado_actual == "En Producción":
+                            if es_almacen and st.button("✔️ Marcar Listo (Almacén)", key=f"btn_alm_{o.get('id')}"):
+                                try:
+                                    # Si almacén da listo y producción ya completó o completamos ambos, regresa a recepción
+                                    nuevo_est = "Listo en Almacén" if o.get('estado_produccion') != "Completado" else "Regresado a Recepción"
+                                    supabase.table("ordenes").update({"estado_almacen": "Listo", "estado": nuevo_est}).eq("id", o.get("id")).execute()
+                                    st.success("✅ Almacén actualizado.")
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Error: {ex}")
+
+                            if es_produccion_area and st.button("🏁 Marcar Completado (Producción)", key=f"btn_comp_{o.get('id')}"):
+                                try:
+                                    supabase.table("ordenes").update({"estado": "Regresado a Recepción"}).eq("id", o.get("id")).execute()
+                                    st.success("✅ Producción completada. Orden devuelta a Recepción.")
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Error: {ex}")
+
+                    # 3. Rol Recepción o Administrador: Subir factura y entregar orden
+                    es_recepcion = rol_lower in ["recepción", "recepcion"]
+                    es_admin = rol_lower == "administrador"
+
+                    if (es_recepcion or es_admin) and estado_actual in ["Regresado a Recepción", "Enviado a Recepción", "Pendiente"]:
+                        st.markdown("---")
+                        st.subheader("🧾 Gestión de Factura y Entrega")
+                        factura_archivo = st.file_uploader("Subir Factura", type=["pdf", "png", "jpg", "jpeg"], key=f"fact_{o.get('id')}")
+                        
+                        if st.button("✅ Marcar Orden Entregada y Guardar Factura", key=f"btn_entregado_{o.get('id')}"):
+                            try:
+                                factura_url = o.get("factura_url", "")
+                                if factura_archivo:
+                                    factura_url = subir_a_supabase(factura_archivo.getvalue(), factura_archivo.name, bucket="disenos")
+                                
+                                supabase.table("ordenes").update({
+                                    "estado": "Orden Entregada",
+                                    "factura_url": factura_url
+                                }).eq("id", o.get("id")).execute()
+                                st.success("🎉 ¡Orden marcada como entregada con éxito!")
+                                st.rerun()
+                            except Exception as ex:
+                                st.error(f"Error al procesar la entrega: {ex}")
+
+                    # Mostrar factura si existe
+                    if o.get('factura_url'):
+                        st.markdown(f"📄 [Ver Factura Adjunta]({o.get('factura_url')})")
+
+                    # Visualización de archivos adjuntos iniciales
                     imagenes = o.get('imagen_url')
                     if imagenes:
                         if isinstance(imagenes, str):
@@ -139,10 +186,9 @@ with tabs[0]:
                         else:
                             lista_archivos = imagenes
                         
-                        st.write("**Archivos y Diseños Adjuntos:**")
+                        st.write("**Archivos y Diseños Iniciales:**")
                         for idx, archivo_url in enumerate(lista_archivos):
                             nombre_archivo = archivo_url.split("/")[-1]
-                            # Verificamos si es una imagen visualizable o un archivo descargable
                             if archivo_url.lower().endswith(('.png', '.jpg', '.jpeg', '.svg')):
                                 st.image(archivo_url, width=200, caption=nombre_archivo)
                             else:
@@ -167,7 +213,6 @@ with tabs[1]:
             area = st.selectbox("Área de Producción", ["Bordado", "Impresión"])
             detalles = st.text_area("Detalles del Diseño / Requerimientos")
             
-            # Extensiones solicitadas para archivos de diseño y formato general
             formatos_soportados = ["pdf", "png", "jpg", "jpeg", "ia", "psd", "cdr", "emb", "eps", "dst", "tbf", "svg"]
             archivos = st.file_uploader(
                 "Subir Archivos (PDF, PNG, JPG, IA, PSD, CDR, EMB, EPS, DST, TBF, SVG)", 

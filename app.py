@@ -359,16 +359,19 @@ with tabs[2]:
                                 for talla in grupo:
                                     cantidad = int(tallas_del_color.get(talla, 0))
                                     if puede_modificar:
-                                        sub1, sub2 = st.columns([1.2, 2.0])
+                                        sub1, sub2, sub3 = st.columns([1.2, 2.0, 0.8])
                                         with sub1:
                                             st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #4ade80;'>{talla}</span></div>", unsafe_allow_html=True)
                                         with sub2:
                                             nueva_cant = st.number_input(f"Talla {talla}", min_value=0, step=1, value=cantidad, key=f"num_{item_id}_{color_sel}_{talla}", label_visibility="collapsed")
-                                            if nueva_cant != cantidad:
-                                                dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
-                                                supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                                                st.cache_data.clear()
-                                                st.rerun()
+                                        with sub3:
+                                            if st.button("💾", key=f"save_{item_id}_{color_sel}_{talla}", help=f"Guardar Talla {talla}"):
+                                                if nueva_cant != cantidad:
+                                                    dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
+                                                    supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                                    st.cache_data.clear()
+                                                    st.success("¡Guardado!")
+                                                    st.rerun()
                                     else:
                                         st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='color: #4ade80;'>{talla}</span>: <b>{cantidad:02d}</b></div>", unsafe_allow_html=True)
                                     st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)

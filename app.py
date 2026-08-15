@@ -41,7 +41,6 @@ if not st.session_state["autenticado"]:
     if st.sidebar.button("Iniciar Sesión"):
         if not usuario_input or not password_input:
             st.sidebar.warning("Por favor ingresa usuario y contraseña.")
-        # Acceso maestro de respaldo para el Administrador
         elif rol_input == "Administrador" and usuario_input.strip().lower() == "admin" and password_input == "2580Admin" and clave_admin == "2580Admin":
             st.session_state["autenticado"] = True
             st.session_state["usuario"] = "admin"
@@ -59,7 +58,6 @@ if not st.session_state["autenticado"]:
                     limpio_input = usuario_input.strip().lower()
                     
                     for u in usuarios_db:
-                        # Buscamos columnas comunes de usuario (usuario, username, name) y contraseña (password, pass)
                         db_user = str(u.get("usuario") or u.get("username") or u.get("name") or "").strip().lower()
                         db_pass = str(u.get("password") or u.get("pass") or "")
                         
@@ -206,17 +204,27 @@ def cargar_panel_principal():
         tab3_roles_disponibles = ["Administrador", "Recepción", "Diseñador", "Almacén", "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"]
         with tab3:
             st.subheader("👥 Gestión de Usuarios")
-            n_user = st.text_input("Nuevo Usuario")
+            n_nombre = st.text_input("Nombre Completo (Obligatorio en BD)")
+            n_user = st.text_input("Nombre de Usuario")
             n_pass = st.text_input("Contraseña", type="password")
             n_rol = st.selectbox("Rol", tab3_roles_disponibles, key="sel_rol_n")
+            
             if st.button("Registrar Usuario"):
-                try:
-                    # Intenta insertar según las columnas comunes de la tabla usuarios
-                    supabase.table("usuarios").insert({"usuario": n_user, "password": n_pass}).execute()
-                    st.success("¡Usuario registrado con éxito en la base de datos!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"No se pudo registrar automáticamente: {e}")
+                if not n_nombre or not n_user or not n_pass:
+                    st.warning("Por favor completa todos los campos.")
+                else:
+                    try:
+                        # Incluimos 'nombre' y 'rol' que son requeridos por la estructura de la base de datos
+                        supabase.table("usuarios").insert({
+                            "nombre": n_nombre,
+                            "usuario": n_user,
+                            "password": n_pass,
+                            "rol": n_rol
+                        }).execute()
+                        st.success("¡Usuario registrado con éxito en la base de datos!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"No se pudo registrar automáticamente: {e}")
             
             st.markdown("---")
             st.subheader("📊 Historial de Movimientos y Cancelaciones")

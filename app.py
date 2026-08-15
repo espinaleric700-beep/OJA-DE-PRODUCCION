@@ -16,6 +16,12 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
+# Lista completa de roles disponibles
+roles_disponibles = [
+    "Administrador", "Recepción", "Diseñador", "Almacén", 
+    "Producción - Bordados", "Producción - Impresión"
+]
+
 # ==========================================
 # GESTIÓN DE SESIÓN
 # ==========================================
@@ -63,12 +69,9 @@ with tabs[0]:
         ordenes = supabase.table("ordenes").select("*").execute().data
         lista_estados = ["Pendiente", "Enviado a Recepción", "En Producción", "Regresado a Recepción", "Orden Entregada"]
         
-        # --- FILTRO AGREGADO ---
         estados_filtro = st.multiselect("Filtrar por estado:", lista_estados, default=[])
-        # -----------------------
         
         if ordenes:
-            # Aplicar filtro si se seleccionó algo
             ordenes_a_mostrar = [o for o in ordenes if (o.get('estado') or o.get('estado_actual')) in estados_filtro] if estados_filtro else ordenes
             
             for o in ordenes_a_mostrar:
@@ -119,17 +122,79 @@ with tabs[1]:
                 st.error(f"Error: {e}")
 
 # ------------------------------------------
-# TAB 2: CONFIGURACIÓN
+# TAB 2: GESTIÓN DE USUARIOS (ADMIN)
 # ------------------------------------------
 with tabs[2]:
     if st.session_state['rol'] == "Administrador":
-        st.subheader("👥 Registrar Usuario")
-        with st.form("reg_user"):
-            n_nombre = st.text_input("Nombre")
-            n_user = st.text_input("Usuario")
+        st.subheader("👥 Registrar Nuevo Usuario")
+        with st.form("reg_user", clear_on_submit=True):
+            n_nombre = st.text_input("Nombre Completo")
+            n_user = st.text_input("Nombre de Usuario")
             n_pass = st.text_input("Contraseña", type="password")
-            if st.form_submit_button("Guardar"):
-                supabase.table("usuarios").insert({"nombre": n_nombre, "usuario": n_user, "password": n_pass, "rol_id": "Usuario"}).execute()
-                st.success("Usuario creado")
+            n_rol = st.selectbox("Rol Asignado", roles_disponibles)
+            
+            if st.form_submit_button("Guardar Usuario"):
+                try:
+                    supabase.table("usuarios").insert({
+                        "nombre": n_nombre, 
+                        "usuario": n_user, 
+                        "password": n_pass, 
+                        "rol_id": n_rol
+                    }).execute()
+                    st.success("✅ Usuario creado con éxito.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al crear usuario: {e}")
+
+        st.divider()
+        st.subheader("🛠️ Usuarios Existentes (Modificar / Eliminar)")
+        
+        try:
+            usuarios_db = supabase.table("usuarios").select("*").execute().data
+            if usuarios_db:
+                for u in usuarios_db:
+                    u_id = u.get("id")
+                    u_nombre = u.get("nombre", "")
+                    u_username = u.get("usuario", "")
+                    u_pass = u.get("password", "")
+                    u_rol = u.get("rol_id", "Recepción")
+                    
+                    with st.expander(f"👤 {u_nombre} (`{u_username}`) - Rol: **{u_rol}**"):
+                        with st.form(f"form_edit_{u_id}"):
+                            edit_nombre = st.text_input("Nombre", value=u_nombre, key=f"n_{u_id}")
+                            edit_user = st.text_input("Usuario", value=u_username, key=f"usr_{u_id}")
+                            edit_pass = st.text_input("Contraseña", value=u_pass, type="password", key=f"p_{u_id}")
+                            
+                            idx_rol = roles_disponibles.index(u_rol) if u_rol in roles_disponibles else 0
+                            edit_rol = st.selectbox("Rol", roles_disponibles, index=idx_rol, key=f"r_{u_id}")
+                            
+                            col1, col2 = st.columns(2)
+                            actualizar = col1.form_submit_button("💾 Guardar Cambios")
+                            eliminar = col2.form_submit_button("🗑️ Eliminar Usuario")
+                            
+                            if actualizar:
+                                try:
+                                    supabase.table("usuarios").update({
+                                        "nombre": edit_nombre,
+                                        "usuario": edit_user,
+                                        "password": edit_pass,
+                                        "rol_id": edit_rol
+                                    }).eq("id", u_id).execute()
+                                    st.success("✅ Usuario actualizado correctamente.")
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Error al actualizar: {ex}")
+                                    
+                            if eliminar:
+                                try:
+                                    supabase.table("usuarios").delete().eq("id", u_id).execute()
+                                    st.warning("⚠️ Usuario eliminado.")
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Error al eliminar: {ex}")
+            else:
+                st.info("No hay usuarios registrados en la base de datos.")
+        except Exception as e:
+            st.error(f"Error al cargar la lista de usuarios: {e}")
     else:
-        st.error("Acceso restringido a Administradores.")
+        st.error("⛔ Acceso restringido. Esta sección es exclusiva para Administradores.")

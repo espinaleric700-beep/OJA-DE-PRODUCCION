@@ -184,9 +184,23 @@ with tabs[2]:
                 dict_colores = {}
                 try:
                     if p_tallas_str:
-                        dict_colores = json.loads(p_tallas_str)
-                        if not isinstance(dict_colores, dict):
-                            dict_colores = {}
+                        temp_data = json.loads(p_tallas_str)
+                        if isinstance(temp_data, dict):
+                            # Verificar si el diccionario tiene la estructura nueva o vieja
+                            # Si la llave contiene las tallas directamente, lo migramos automáticamente
+                            es_estructura_vieja = any(t in temp_data for t in tallas_disponibles)
+                            if es_estructura_vieja:
+                                dict_colores = {
+                                    "Único": {
+                                        "tallas": {t: int(temp_data.get(t, 0)) for t in tallas_disponibles},
+                                        "imagen_url": item.get("imagen_url", ""),
+                                        "hex": "#3b82f6"
+                                    }
+                                }
+                                # Actualizar automáticamente en Supabase para corregirlo de forma definitiva
+                                supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                            else:
+                                dict_colores = temp_data
                 except Exception:
                     dict_colores = {}
 
@@ -222,7 +236,6 @@ with tabs[2]:
                         st.markdown(f"**Existencias para el color: `{color_sel}`**")
                         tallas_del_color = data_color.get("tallas", {})
                         
-                        # --- DISTRIBUCIÓN EXACTA EN 3 COLUMNAS VERTICALES (Estilo de tu imagen) ---
                         columna_1 = ["2", "4", "6", "8", "10"]
                         columna_2 = ["12", "14", "16", "S", "M"]
                         columna_3 = ["WS", "WM", "L", "XL", "2XL"]
@@ -234,7 +247,7 @@ with tabs[2]:
                             with grid_cols[col_idx]:
                                 for talla in grupo:
                                     cantidad = tallas_del_color.get(talla, 0)
-                                    cant_str = f"{cantidad:02d}"  # Formato de dos dígitos ej. '00', '05'
+                                    cant_str = f"{cantidad:02d}"
                                     
                                     if puede_modificar:
                                         sub1, sub2, sub3 = st.columns([1.2, 1.5, 1])
@@ -243,7 +256,6 @@ with tabs[2]:
                                         with sub2:
                                             st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #f3f4f6;'>{cant_str}</span></div>", unsafe_allow_html=True)
                                         with sub3:
-                                            # Botones apilados verticalmente para +/-
                                             if st.button("➕", key=f"p_{item_id}_{color_sel}_{talla}"):
                                                 dict_colores[color_sel]["tallas"][talla] = cantidad + 1
                                                 supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()

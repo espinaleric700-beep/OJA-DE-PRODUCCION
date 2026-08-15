@@ -1,11 +1,15 @@
 from datetime import datetime
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 from supabase import create_client
 
 # ==========================================
 # CONFIGURACIÓN Y CONEXIÓN
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
+
+# Autorrefresco cada 10 segundos (10000 milisegundos)
+st_autorefresh(interval=10000, key="datarefresh")
 
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
@@ -17,23 +21,52 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     return supabase.storage.from_(bucket).get_public_url(path)
 
 # ==========================================
-# AUTENTICACIÓN
+# GESTIÓN DE SESIÓN (Persistente al actualizar)
 # ==========================================
+if "autenticado" not in st.session_state:
+    st.session_state["autenticado"] = False
+    st.session_state["usuario"] = ""
+    st.session_state["rol"] = ""
+
 st.sidebar.title("🔐 Control de Acceso")
-usuario = st.sidebar.text_input("Usuario")
-password = st.sidebar.text_input("Contraseña", type="password")
-roles_disponibles = ["Administrador", "Recepción", "Diseñador", "Almacén", "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"]
-rol_seleccionado = st.sidebar.selectbox("Rol", roles_disponibles)
+
+if not st.session_state["autenticado"]:
+    usuario_input = st.sidebar.text_input("Usuario", key="input_usuario")
+    password_input = st.sidebar.text_input("Contraseña", type="password", key="input_password")
+    
+    roles_disponibles = ["Administrador", "Recepción", "Diseñador", "Almacén", "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"]
+    rol_input = st.sidebar.selectbox("Rol", roles_disponibles, key="input_rol")
+    
+    if rol_input == "Administrador":
+        clave_admin = st.sidebar.text_input("Clave de Administrador", type="password", key="input_clave_admin")
+    else:
+        clave_admin = ""
+
+    if st.sidebar.button("Iniciar Sesión"):
+        if rol_input == "Administrador" and clave_admin != "2580Admin":
+            st.sidebar.error("Clave de Administrador incorrecta.")
+        elif not usuario_input:
+            st.sidebar.warning("Por favor ingresa tu usuario.")
+        else:
+            # Guardar estado de sesión
+            st.session_state["autenticado"] = True
+            st.session_state["usuario"] = usuario_input
+            st.session_state["rol"] = rol_input
+            st.rerun()
+    st.stop()
+
+# Si ya está autenticado, recuperamos los valores de la sesión
+usuario = st.session_state["usuario"]
+rol_seleccionado = st.session_state["rol"]
+
+# Botón para cerrar sesión en el sidebar
+if st.sidebar.button("🚪 Cerrar Sesión"):
+    st.session_state["autenticado"] = False
+    st.session_state["usuario"] = ""
+    st.session_state["rol"] = ""
+    st.rerun()
 
 ROLES_AUTORIZADOS_CREAR = ["Administrador", "Recepción", "Diseñador"]
-
-if rol_seleccionado == "Administrador":
-    if st.sidebar.text_input("Clave de Administrador", type="password") != "2580Admin":
-        st.sidebar.error("Clave incorrecta")
-        st.stop()
-if not usuario:
-    st.warning("Por favor ingresa tu usuario")
-    st.stop()
 
 # ==========================================
 # MAPA DE PENDIENTES
@@ -85,7 +118,6 @@ with tab1:
                         st.markdown(f"[🔗 Ver Archivo Diseño]({o['archivo_diseno']})")
 
                 with col_acciones:
-                    # Cancelar orden (Admin, Recepción, Diseñador)
                     if rol_seleccionado in ROLES_AUTORIZADOS_CREAR:
                         with st.popover("❌ Cancelar Orden"):
                             motivo = st.text_area("Motivo de cancelación", key=f"motivo_{o['id']}")
@@ -100,7 +132,7 @@ with tab1:
                                 else:
                                     st.warning("Escribe un motivo.")
 
-                # BOTONES DE CAMBIO DE ESTADO SEGÚN EL FLUJO
+                # BOTONES DE CAMBIO DE ESTADO
                 estado = o["estado_actual"]
                 nuevo_estado = estado
 

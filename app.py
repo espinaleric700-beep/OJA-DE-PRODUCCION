@@ -263,8 +263,9 @@ with tabs[2]:
                         st.markdown("#### 📏 Tallas y Existencias:")
                         
                         if dict_tallas:
-                            # 6 columnas por fila para aprovechar el ancho horizontal eficientemente
-                            cols_por_fila = 6
+                            # Contenedor con altura fija y scroll interno para mantener la altura alineada con la imagen
+                            tallas_html = "<div style='max-height: 280px; overflow-y: auto; padding-right: 5px;'>"
+                            cols_por_fila = 4
                             tallas_items = list(dict_tallas.items())
                             
                             for i in range(0, len(tallas_items), cols_por_fila):
@@ -273,7 +274,7 @@ with tabs[2]:
                                     if i + j < len(tallas_items):
                                         talla, cantidad = tallas_items[i + j]
                                         with fila_cols[j]:
-                                            st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 6px; border: 1px solid #1f2937; text-align: center;'><b>{talla}</b><br><span style='font-size: 1.1em; color: #60a5fa;'>{cantidad}</span></div>", unsafe_allow_html=True)
+                                            st.markdown(f"<div style='background-color: #111827; padding: 5px; border-radius: 6px; border: 1px solid #1f2937; text-align: center; margin-bottom: 2px;'><b>{talla}</b><br><span style='font-size: 1em; color: #60a5fa;'>{cantidad}</span></div>", unsafe_allow_html=True)
                                             
                                             if puede_modificar:
                                                 sub_c1, sub_c2 = st.columns(2)
@@ -290,7 +291,6 @@ with tabs[2]:
                                                         nuevo_str = ", ".join([f"{tk}: {tv}" for tk, tv in dict_tallas.items()])
                                                         supabase.table("almacen").update({"tallas_existencias": nuevo_str}).eq("id", item_id).execute()
                                                         st.rerun()
-                                        st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)
                         else:
                             st.info("No hay tallas definidas.")
                         

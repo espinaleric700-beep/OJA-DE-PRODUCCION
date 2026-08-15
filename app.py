@@ -245,7 +245,7 @@ with tabs[2]:
                     
                     with col_img:
                         if p_imagen:
-                            st.image(p_imagen, use_column_width=True)
+                            st.image(p_imagen, use_container_width=True)
                         else:
                             st.info("Sin foto disponible")
                             

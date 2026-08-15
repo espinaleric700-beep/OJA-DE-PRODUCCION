@@ -1,6 +1,5 @@
 from datetime import datetime
 import streamlit as st
-import streamlit.components.v1 as components
 from supabase import create_client
 from streamlit_autorefresh import st_autorefresh
 import json
@@ -273,42 +272,20 @@ with tabs[2]:
                         if key_pills not in st.session_state or st.session_state[key_pills] not in lista_cols:
                             st.session_state[key_pills] = lista_cols[0]
 
-                        color_seleccionado_ver = st.session_state[key_pills]
-
                         st.markdown("Colores")
                         
-                        # Construir el contenedor HTML completo de manera segura usando components.html
-                        componentes_html = f'''
-                        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">
-                        '''
+                        # Usando st.pills nativo de Streamlit para una respuesta instantánea y perfectamente sincronizada
+                        color_seleccionado_ver = st.pills(
+                            "Colores disponibles", 
+                            lista_cols, 
+                            default=st.session_state[key_pills], 
+                            key=f"widget_pills_{item_id}",
+                            label_visibility="collapsed"
+                        )
                         
-                        for col_name in lista_cols:
-                            info_col = dict_colores[col_name]
-                            color_hex = info_col.get("hex", "#3b82f6") if isinstance(info_col, dict) else "#3b82f6"
-                            es_seleccionado = (color_seleccionado_ver == col_name)
-                            
-                            borde_estilo = "box-shadow: 0 0 0 2px #0b0f19, 0 0 0 4px #3b82f6, inset 0 0 0 3px #ffffff;" if es_seleccionado else "box-shadow: inset 0 0 0 3px #ffffff, 0 2px 4px rgba(0,0,0,0.3);"
-                            
-                            componentes_html += f'''
-                                <button onclick="window.parent.location.href='?item_{item_id}={col_name}'" 
-                                        title="{col_name}"
-                                        style="background-color: {color_hex}; width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer; {borde_estilo} transition: transform 0.1s ease;">
-                                </button>
-                            '''
-                        
-                        componentes_html += '</div>'
-                        
-                        # Renderizar usando el componente HTML nativo de Streamlit
-                        components.html(componentes_html, height=50)
-
-                        # Capturar parámetro por URL para cambio de estado inmediato sin recargas complejas de columnas
-                        params = st.query_params
-                        param_key = f"item_{item_id}"
-                        if param_key in params:
-                            nuevo_sel = params[param_key]
-                            if nuevo_sel in lista_cols and st.session_state[key_pills] != nuevo_sel:
-                                st.session_state[key_pills] = nuevo_sel
-                                st.rerun()
+                        if color_seleccionado_ver and color_seleccionado_ver != st.session_state[key_pills]:
+                            st.session_state[key_pills] = color_seleccionado_ver
+                            st.rerun()
 
                         color_seleccionado_ver = st.session_state[key_pills]
                         

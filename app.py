@@ -79,9 +79,9 @@ def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, histori
 if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 if "colores_inventario_avanzado" not in st.session_state: st.session_state["colores_inventario_avanzado"] = {}
 
-# --- Autenticación ---
-st.sidebar.title("🔐 Control de Acceso")
+# --- Autenticación y Barra Lateral ---
 if not st.session_state["autenticado"]:
+    st.sidebar.title("🔐 Control de Acceso")
     usuario_input = st.sidebar.text_input("Usuario")
     password_input = st.sidebar.text_input("Contraseña", type="password")
     if st.sidebar.button("Iniciar Sesión"):
@@ -99,7 +99,11 @@ if not st.session_state["autenticado"]:
             except Exception as e: st.sidebar.error(f"Error: {e}")
     st.stop()
 
+# Si ya está autenticado, mostramos el mensaje de bienvenida y el botón en el sidebar
+st.sidebar.markdown("### 🔐 Control de Acceso")
+st.sidebar.success(f"👋 ¡Bienvenido, **{st.session_state['usuario']}**!\n\nRol: *{st.session_state['rol']}*")
 st.sidebar.button("🚪 Cerrar Sesión", on_click=lambda: st.session_state.update({"autenticado": False}))
+
 st.title("🧵 Pixel Thread - Gestión")
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "📦 Almacén", "⚙️ Usuarios"])
 

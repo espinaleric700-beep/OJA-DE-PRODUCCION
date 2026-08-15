@@ -273,19 +273,29 @@ with tabs[2]:
                         if key_pills not in st.session_state or st.session_state[key_pills] not in lista_cols:
                             st.session_state[key_pills] = lista_cols[0]
 
-                        # Inyectar estilos CSS para botones de colores compactos y pegados sin espacio
+                        # Estilos CSS para convertir los botones en círculos de colores pegados estilo paleta
                         st.markdown("""
                             <style>
-                            .color-btn-container { display: flex; flex-wrap: wrap; gap: 0px; margin-bottom: 10px; }
-                            .color-btn-container div[data-testid="column"] { width: auto !important; flex: 0 0 auto !important; padding: 0px !important; margin: 0px !important; }
-                            .color-btn-container .stButton > button { border-radius: 0px !important; border-right: 1px solid rgba(255,255,255,0.2) !important; font-size: 0.85rem !important; padding: 0.3rem 0.8rem !important; margin: 0px !important; }
-                            .color-btn-container div[data-testid="column"]:first-child .stButton > button { border-top-left-radius: 6px !important; border-bottom-left-radius: 6px !important; }
-                            .color-btn-container div[data-testid="column"]:last-child .stButton > button { border-top-right-radius: 6px !important; border-bottom-right-radius: 6px !important; border-right: none !important; }
+                            .circle-palette { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+                            .circle-palette div[data-testid="column"] { width: auto !important; flex: 0 0 auto !important; padding: 0px !important; margin: 0px !important; }
+                            .circle-palette .stButton > button {
+                                width: 34px !important;
+                                height: 34px !important;
+                                min-height: 34px !important;
+                                border-radius: 50% !important;
+                                padding: 0px !important;
+                                font-size: 0px !important;
+                                box-shadow: inset 0 0 0 3px #ffffff, 0 2px 4px rgba(0,0,0,0.3);
+                                transition: transform 0.1s ease;
+                            }
+                            .circle-palette .stButton > button:hover {
+                                transform: scale(1.1);
+                            }
                             </style>
                         """, unsafe_allow_html=True)
 
-                        st.markdown("🎨 **Selecciona el color:**")
-                        st.markdown('<div class="color-btn-container">', unsafe_allow_html=True)
+                        st.markdown("Colores")
+                        st.markdown('<div class="circle-palette">', unsafe_allow_html=True)
                         cols_colores = st.columns(len(lista_cols), gap="small")
                         for idx, col_name in enumerate(lista_cols):
                             with cols_colores[idx]:
@@ -293,21 +303,19 @@ with tabs[2]:
                                 color_hex = info_col.get("hex", "#3b82f6") if isinstance(info_col, dict) else "#3b82f6"
                                 es_seleccionado = (st.session_state[key_pills] == col_name)
                                 
-                                # Estilo de borde brillante si está seleccionado
-                                border_style = "border: 2px solid #ffffff !important;" if es_seleccionado else "border: 1px solid rgba(255,255,255,0.2) !important;"
-                                
-                                # Renderizar botón con su color correspondiente
-                                btn_html_style = f"background-color: {color_hex} !important; color: #ffffff !important; {border_style} font-weight: bold; width: 100%;"
+                                # Anillo exterior doble si está seleccionado (exactamente como en la referencia visual)
+                                ring_style = "box-shadow: 0 0 0 2px #0b0f19, 0 0 0 4px #3b82f6, inset 0 0 0 3px #ffffff !important;" if es_seleccionado else "box-shadow: inset 0 0 0 3px #ffffff, 0 2px 4px rgba(0,0,0,0.3) !important;"
                                 
                                 st.markdown(f"""
                                     <style>
-                                    div.stButton > button#btn_col_{item_id}_{idx} {{
-                                        {btn_html_style}
+                                    div.stButton > button#btn_circle_{item_id}_{idx} {{
+                                        background-color: {color_hex} !important;
+                                        {ring_style}
                                     }}
                                     </style>
                                 """, unsafe_allow_html=True)
                                 
-                                if st.button(col_name, key=f"btn_col_{item_id}_{idx}"):
+                                if st.button(col_name, key=f"btn_circle_{item_id}_{idx}", help=col_name):
                                     st.session_state[key_pills] = col_name
                                     st.rerun()
                         st.markdown('</div>', unsafe_allow_html=True)

@@ -214,12 +214,11 @@ def cargar_panel_principal():
                     st.warning("Por favor completa todos los campos.")
                 else:
                     try:
-                        # Incluimos 'nombre' y 'rol' que son requeridos por la estructura de la base de datos
+                        # Se omite 'rol' porque la tabla usuarios no tiene esa columna
                         supabase.table("usuarios").insert({
                             "nombre": n_nombre,
                             "usuario": n_user,
-                            "password": n_pass,
-                            "rol": n_rol
+                            "password": n_pass
                         }).execute()
                         st.success("¡Usuario registrado con éxito en la base de datos!")
                         st.rerun()

@@ -60,7 +60,7 @@ if not st.session_state["autenticado"]:
                 if usuario_encontrado:
                     st.session_state["autenticado"] = True
                     st.session_state["usuario"] = usuario_input
-                    st.session_state["rol"] = usuario_encontrado.get("rol", "")
+                    st.session_state["rol"] = usuario_encontrado.get("rol_id", "")
                     st.rerun()
                 else:
                     st.sidebar.error("❌ Usuario o contraseña incorrectos.")
@@ -86,11 +86,12 @@ with tabs[2]: # Pestaña de Configuración
         
         if st.form_submit_button("Guardar Usuario"):
             try:
+                # Usamos rol_id para guardar el texto directamente en esa columna existente
                 supabase.table("usuarios").insert({
                     "nombre": n_nombre, 
                     "usuario": n_user, 
                     "password": n_pass, 
-                    "rol": n_rol
+                    "rol_id": n_rol
                 }).execute()
                 st.success("✅ Usuario creado con éxito.")
                 st.rerun()
@@ -101,6 +102,7 @@ with tabs[2]: # Pestaña de Configuración
     try:
         usuarios = supabase.table("usuarios").select("*").execute().data
         for u in usuarios:
-            st.write(f"👤 **{u.get('nombre')}** | Usuario: {u.get('usuario')} | Rol: {u.get('rol')}")
+            rol_actual = u.get('rol_id') or u.get('rol') or 'Sin rol'
+            st.write(f"👤 **{u.get('nombre')}** | Usuario: {u.get('usuario')} | Rol: {rol_actual}")
     except Exception as e:
         st.error("No se pudieron cargar los usuarios.")

@@ -75,7 +75,11 @@ if rol_seleccionado in mapa_roles:
 st.title("🧵 Pixel Thread - Gestión de Órdenes")
 busqueda = st.text_input("🔍 Buscador rápido (Número de orden, Cliente o Nombre de orden)")
 
-tab1, tab2 = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden"])
+# Pestañas principales (incluyendo Configuración de Usuarios si es Admin)
+if rol_seleccionado == "Administrador":
+    tab1, tab2, tab3 = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "⚙️ Configuración / Usuarios"])
+else:
+    tab1, tab2 = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden"])
 
 with tab1:
     if ordenes_db:
@@ -84,7 +88,7 @@ with tab1:
                              busqueda.lower() not in o.get("nombre_cliente", "").lower()):
                 continue
 
-            # Verificar si esta orden en particular está pendiente para el rol actual
+            # Verificar si esta orden está pendiente para el rol actual
             es_pendiente = False
             if rol_seleccionado == "Administrador":
                 es_pendiente = True
@@ -96,13 +100,13 @@ with tab1:
                 else:
                     es_pendiente = True
 
-            # Etiqueta visual al lado del expander si está pendiente
             etiqueta_aviso = " 🔴 [PENDIENTE]" if es_pendiente else ""
 
             with st.expander(f"Orden: {o['numero_orden']} | Estado: **{o['estado_actual']}**{etiqueta_aviso}"):
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write(f"**Cliente:** {o['nombre_cliente']} | **Área:** {o['area_produccion']}")
+                    st.write(f"**Creado por:** {o.get('creado_por', 'N/A')}")
                     if o.get("archivo_diseno"):
                         st.markdown(f"[🔗 Ver Archivo Diseño]({o['archivo_diseno']})")
                 
@@ -127,6 +131,13 @@ with tab1:
 
                 if nuevo_estado != estado:
                     supabase.table("ordenes").update({"estado_actual": nuevo_estado}).eq("id", o["id"]).execute()
+                    # Opcional: Registrar historial de cambios si tienes la tabla historial_ordenes
+                    try:
+                        supabase.table("historial_ordenes").insert({
+                            "orden_id": o["id"], "estado_anterior": estado, "estado_nuevo": nuevo_estado, "cambiado_por": usuario
+                        }).execute()
+                    except:
+                        pass
                     st.rerun()
 
 with tab2:
@@ -140,7 +151,7 @@ with tab2:
             total_ordenes = len(ordenes_db) + 1
             num_formateado = f"{total_ordenes:03d}"
             
-            urls = [subir_a_supabase(f.getvalue(), f.name) for f in archivos]
+            urls = [subir_a_supabase(f.getvalue(), f.name) for f in archivos] if archivos else []
             supabase.table("ordenes").insert({
                 "numero_orden": f"ORD-{num_formateado}",
                 "nombre_cliente": nombre_cliente, "nombre_orden": nombre_orden,
@@ -149,3 +160,29 @@ with tab2:
             }).execute()
             st.success(f"Orden ORD-{num_formateado} creada con éxito")
             st.rerun()
+
+if rol_seleccionado == "Administrador":
+    with tab3:
+        st.subheader("👥 Gestión de Usuarios y Roles del Sistema")
+        nuevo_usuario_input = st.text_input("Nuevo Usuario")
+        rol_nuevo_input = st.selectbox("Rol Asignado", roles_disponibles, key="select_rol_nuevo")
+        if st.button("Registrar Usuario"):
+            if nuevo_usuario_input:
+                try:
+                    supabase.table("usuarios").insert({"usuario": nuevo_usuario_input, "rol": rol_nuevo_input}).execute()
+                    st.success(f"Usuario {nuevo_usuario_input} registrado con éxito.")
+                except Exception as e:
+                    st.error(f"Error al registrar usuario (asegúrate de tener la tabla 'usuarios' creada): {e}")
+            else:
+                st.warning("Escribe un nombre de usuario.")
+        
+        st.markdown("---")
+        st.subheader("📊 Historial de Órdenes Registradas")
+        try:
+            historial_db = supabase.table("historial_ordenes").select("*").execute().data
+            if historial_db:
+                st.dataframe(historial_db)
+            else:
+                st.info("No hay registros en el historial todavía.")
+        except:
+            st.info("La tabla 'historial_ordenes' no está configurada o está vacía en Supabase.")

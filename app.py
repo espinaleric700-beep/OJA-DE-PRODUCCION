@@ -126,7 +126,6 @@ def cargar_panel_principal():
     with tab1:
         if ordenes_db:
             for o in ordenes_db:
-                # Ocultar si está Cancelado o Entregado de la vista principal
                 if o["estado_actual"] in ["Cancelado", "Entregado"]: 
                     continue
                 
@@ -172,7 +171,7 @@ def cargar_panel_principal():
                         elif o["area_produccion"] == "Impresion" and rol_seleccionado in ["Administrador", "Producción - Impresión"]:
                             if st.button("🟢 Enviar a Transferencia Térmica", key=f"btn_{o['id']}"): nuevo_estado = "Enviado a Transferencia Térmica"
                     elif estado == "Enviado a Transferencia Térmica" and rol_seleccionado in ["Administrador", "Transferencia Térmica"]:
-                        if st.button("🟢 Enviar a Recepción", key=f"btn_{o['id']}"): nuevo_estado = "Enviado a Recepción"
+                        if st.button("🟢 Marcar como Completado", key=f"btn_{o['id']}"): nuevo_estado = "Completado"
                     elif estado in ["Completado", "Enviado a Recepción"] and rol_seleccionado in ["Administrador", "Recepción"]:
                         if st.button("🟢 Marcar como Entregado", key=f"btn_{o['id']}"): nuevo_estado = "Entregado"
 

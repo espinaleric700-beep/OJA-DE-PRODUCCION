@@ -68,7 +68,6 @@ def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, histori
     if nuevo_estado == estado_anterior:
         return
     
-    # Crear el registro del cambio actual
     ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     nuevo_registro = {
         "usuario": usuario_actual,
@@ -77,7 +76,6 @@ def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, histori
         "fecha": ahora
     }
     
-    # Parsear el historial existente (puede venir como string JSON o lista)
     lista_historial = []
     if historial_actual:
         if isinstance(historial_actual, str):
@@ -88,12 +86,11 @@ def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, histori
         elif isinstance(historial_actual, list):
             lista_historial = historial_actual
             
-    lista_historial.insert(0, nuevo_registro)  # Insertar el más reciente al principio
+    lista_historial.insert(0, nuevo_registro)
     
-    # Actualizar en Supabase
     supabase.table("ordenes").update({
         "estado": nuevo_estado,
-        "historial_estados": json.dumps(lista_historial)
+        "historial": json.dumps(lista_historial)
     }).eq("id", o_id).execute()
 
 # Estado global inicial
@@ -145,9 +142,8 @@ with tabs[0]:
                 numero_o = o.get('numero_orden', 'S/N')
                 cliente_o = o.get('nombre_cliente', 'Sin cliente')
                 estado_actual = o.get('estado', 'Pendiente')
-                historial_db = o.get('historial_estados', "[]")
+                historial_db = o.get('historial', "[]")
                 
-                # Diseño de columnas para incluir el selector rápido en el lateral derecho de la barra
                 col_exp, col_select = st.columns([3.5, 1.5])
                 
                 with col_select:
@@ -169,7 +165,6 @@ with tabs[0]:
 
                 with col_exp:
                     with st.expander(f"Orden #{numero_o} - {cliente_o} [Estado: {estado_actual}]"):
-                        # Solo mostrar datos del cliente y pagos si es Administrador o Recepción
                         if st.session_state['rol'] in ["Administrador", "Recepción"]:
                             col_info1, col_info2 = st.columns(2)
                             with col_info1:
@@ -193,7 +188,6 @@ with tabs[0]:
                                 st.success("✅ ¡Estado actualizado y registrado en el historial!")
                                 st.rerun()
                         
-                        # Mostrar el Historial de Estados
                         st.markdown("---")
                         st.markdown("📜 **Historial de Cambios de Estado:**")
                         try:
@@ -246,7 +240,6 @@ with tabs[1]:
         if submit_nueva_orden:
             if nombre_cliente.strip():
                 try:
-                    # Crear el historial inicial indicando la creación
                     historial_inicial = [{
                         "usuario": st.session_state['usuario'],
                         "de": "Inicio",
@@ -265,7 +258,7 @@ with tabs[1]:
                         "restante": max(0.0, restante_calc),
                         "observaciones": observaciones,
                         "estado": "Pendiente",
-                        "historial_estados": json.dumps(historial_inicial)
+                        "historial": json.dumps(historial_inicial)
                     }).execute()
                     st.success(f"✅ ¡Orden #{numero_auto} creada y guardada correctamente!")
                     st.rerun()

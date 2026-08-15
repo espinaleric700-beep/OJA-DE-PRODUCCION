@@ -2,3 +2,5 @@ streamlit
 supabase
 firebase-admin
 pandas
+streamlit-autorefresh
+supabase

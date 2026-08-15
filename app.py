@@ -45,14 +45,22 @@ if not st.session_state["autenticado"]:
             st.sidebar.warning("Por favor ingresa usuario y contraseña.")
         else:
             try:
-                # Buscamos solo por usuario y contraseña para evitar el error de columna faltante
-                res = supabase.table("usuarios").select("*").eq("usuario", usuario_input).eq("password", password_input).execute()
-                usuarios_encontrados = res.data
+                # Traemos todos los usuarios para validar sin problemas de mayúsculas/minúsculas o espacios
+                res = supabase.table("usuarios").select("*").execute()
+                usuarios_db = res.data
+                
+                usuario_encontrado = None
+                limpio_input = usuario_input.strip().lower()
+                
+                for u in usuarios_db:
+                    if str(u.get("usuario", "")).strip().lower() == limpio_input:
+                        if str(u.get("password", "")) == str(password_input):
+                            usuario_encontrado = u
+                            break
 
-                if usuarios_encontrados:
+                if usuario_encontrado:
                     st.session_state["autenticado"] = True
-                    st.session_state["usuario"] = usuario_input
-                    # Asignamos el rol que el usuario seleccionó o el que tenga en la BD
+                    st.session_state["usuario"] = usuario_encontrado.get("usuario")
                     st.session_state["rol"] = rol_input
                     st.rerun()
                 else:

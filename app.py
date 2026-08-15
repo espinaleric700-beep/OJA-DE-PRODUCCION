@@ -115,17 +115,19 @@ with tabs[0]:
                 estado_actual = o.get('estado', 'Pendiente')
                 
                 with st.expander(f"Orden #{numero_o} - {cliente_o} [Estado: {estado_actual}]"):
-                    col_info1, col_info2 = st.columns(2)
-                    with col_info1:
-                        st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
-                        st.write(f"**Fecha de Entrega:** {o.get('fecha_entrega', 'N/D')}")
-                        st.write(f"**Tipo de Servicio:** {o.get('tipo_servicio', 'N/D')}")
-                    with col_info2:
-                        st.write(f"**Total:** ${o.get('total', 0)}")
-                        st.write(f"**Abono:** ${o.get('abono', 0)}")
-                        st.write(f"**Restante:** ${o.get('restante', 0)}")
+                    # Solo mostrar datos del cliente y pagos si es Administrador o Recepción
+                    if st.session_state['rol'] in ["Administrador", "Recepción"]:
+                        col_info1, col_info2 = st.columns(2)
+                        with col_info1:
+                            st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
+                            st.write(f"**Fecha de Entrega:** {o.get('fecha_entrega', 'N/D')}")
+                            st.write(f"**Tipo de Servicio:** {o.get('tipo_servicio', 'N/D')}")
+                        with col_info2:
+                            st.write(f"**Total:** ${o.get('total', 0)}")
+                            st.write(f"**Abono:** ${o.get('abono', 0)}")
+                            st.write(f"**Restante:** ${o.get('restante', 0)}")
+                        st.markdown("---")
                     
-                    st.markdown("---")
                     nuevo_estado_sel = st.selectbox("Cambiar Estado de la Orden", lista_estados, index=lista_estados.index(estado_actual) if estado_actual in lista_estados else 0, key=f"select_est_{o_id}")
                     
                     if nuevo_estado_sel != estado_actual:

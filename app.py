@@ -47,13 +47,28 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
+def obtener_siguiente_numero_orden():
+    try:
+        res = supabase.table("ordenes").select("numero_orden").execute()
+        if res.data:
+            numeros = []
+            for row in res.data:
+                val = row.get("numero_orden", "")
+                nums_encontrados = re.findall(r'\d+', str(val))
+                if nums_encontrados:
+                    numeros.append(int(nums_encontrados[-1]))
+            
+            siguiente = max(numeros) + 1 if numeros else 1
+            return f"{siguiente:07d}"
+    except Exception:
+        pass
+    return "0000001"
+
 # Estado global inicial
 if "autenticado" not in st.session_state:
     st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 if "colores_inventario_avanzado" not in st.session_state:
     st.session_state["colores_inventario_avanzado"] = {}
-if "items_orden_actual" not in st.session_state:
-    st.session_state["items_orden_actual"] = []
 
 # --- Autenticación ---
 st.sidebar.title("🔐 Control de Acceso")
@@ -83,7 +98,6 @@ tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "📦 Almacén", "⚙️
 with tabs[0]:
     st.subheader("📋 Listado de Órdenes")
     
-    # Filtro por estado
     filtro_estado = st.selectbox("Filtrar por Estado", ["Todos"] + lista_estados, key="filtro_estado_ordenes")
     
     try:
@@ -127,10 +141,12 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("➕ Crear Nueva Orden")
     
+    numero_auto = obtener_siguiente_numero_orden()
+    
     with st.form("form_crear_orden_completa"):
         col_c1, col_c2 = st.columns(2)
         with col_c1:
-            numero_orden = st.text_input("Número de Orden")
+            st.text_input("Número de Orden (Automático)", value=numero_auto, disabled=True)
             nombre_cliente = st.text_input("Nombre del Cliente")
             telefono_cliente = st.text_input("Teléfono del Cliente")
         with col_c2:
@@ -152,10 +168,10 @@ with tabs[1]:
         
         submit_nueva_orden = st.form_submit_button("💾 Guardar Orden Definitiva")
         if submit_nueva_orden:
-            if numero_orden.strip() and nombre_cliente.strip():
+            if nombre_cliente.strip():
                 try:
                     supabase.table("ordenes").insert({
-                        "numero_orden": numero_orden,
+                        "numero_orden": numero_auto,
                         "nombre_cliente": nombre_cliente,
                         "telefono": telefono_cliente,
                         "tipo_servicio": tipo_servicio,
@@ -166,12 +182,12 @@ with tabs[1]:
                         "observaciones": observaciones,
                         "estado": "Pendiente"
                     }).execute()
-                    st.success("✅ ¡Orden creada y guardada correctamente!")
+                    st.success(f"✅ ¡Orden #{numero_auto} creada y guardada correctamente!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error al guardar la orden: {e}")
             else:
-                st.warning("⚠️ Debes llenar al menos el número de orden y el nombre del cliente.")
+                st.warning("⚠️ Debes ingresar el nombre del cliente.")
 
 with tabs[2]:
     st.subheader("📦 Control de Inventario")

@@ -178,8 +178,10 @@ def cargar_panel_principal():
                     if nuevo_estado != estado:
                         supabase.table("ordenes").update({"estado_actual": nuevo_estado}).eq("id", o["id"]).execute()
                         try:
+                            # Registramos tanto los cambios normales como los estados finales (Entregado / Cancelado)
+                            estado_historial = "ENTREGADO" if nuevo_estado == "Entregado" else (nuevo_estado.upper() if nuevo_estado in ["Completado", "Cancelado"] else nuevo_estado)
                             supabase.table("historial_ordenes").insert({
-                                "orden_id": o["id"], "estado_anterior": estado, "estado_nuevo": nuevo_estado, "cambiado_por": usuario
+                                "orden_id": o["id"], "estado_anterior": estado, "estado_nuevo": estado_historial, "cambiado_por": usuario
                             }).execute()
                         except:
                             pass

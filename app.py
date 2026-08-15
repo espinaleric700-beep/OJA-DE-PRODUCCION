@@ -72,37 +72,46 @@ if not st.session_state["autenticado"]:
 # PANEL PRINCIPAL
 # ==========================================
 st.sidebar.button("🚪 Cerrar Sesión", on_click=lambda: st.session_state.update({"autenticado": False}))
+st.sidebar.info(f"👤 Conectado como: **{st.session_state['usuario']}**\n\n🛡️ Rol: **{st.session_state['rol']}**")
+
 st.title("🧵 Pixel Thread - Gestión")
 
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "⚙️ Configuración / Usuarios"])
 
 with tabs[2]: # Pestaña de Configuración
-    st.subheader("👥 Registrar Nuevo Usuario")
-    with st.form("form_reg_usuario", clear_on_submit=True):
-        n_nombre = st.text_input("Nombre Completo")
-        n_user = st.text_input("Nombre de Usuario")
-        n_pass = st.text_input("Contraseña", type="password")
-        n_rol = st.selectbox("Rol Asignado", roles_disponibles)
-        
-        if st.form_submit_button("Guardar Usuario"):
-            try:
-                # Usamos rol_id para guardar el texto directamente en esa columna existente
-                supabase.table("usuarios").insert({
-                    "nombre": n_nombre, 
-                    "usuario": n_user, 
-                    "password": n_pass, 
-                    "rol_id": n_rol
-                }).execute()
-                st.success("✅ Usuario creado con éxito.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error al registrar usuario: {e}")
+    # Validamos estrictamente si el rol actual es Administrador
+    if str(st.session_state.get("rol")).strip().lower() != "administrador":
+        st.error("⛔ Acceso denegado. Esta sección es exclusiva para el Panel de Administración.")
+    else:
+        st.subheader("👥 Registrar Nuevo Usuario")
+        with st.form("form_reg_usuario", clear_on_submit=True):
+            n_nombre = st.text_input("Nombre Completo")
+            n_user = st.text_input("Nombre de Usuario")
+            n_pass = st.text_input("Contraseña", type="password")
+            n_rol = st.selectbox("Rol Asignado", roles_disponibles)
+            
+            if st.form_submit_button("Guardar Usuario"):
+                try:
+                    supabase.table("usuarios").insert({
+                        "nombre": n_nombre, 
+                        "usuario": n_user, 
+                        "password": n_pass, 
+                        "rol_id": n_rol
+                    }).execute()
+                    st.success("✅ Usuario creado con éxito.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al registrar usuario: {e}")
 
-    st.subheader("🛠️ Usuarios Existentes")
-    try:
-        usuarios = supabase.table("usuarios").select("*").execute().data
-        for u in usuarios:
-            rol_actual = u.get('rol_id') or u.get('rol') or 'Sin rol'
-            st.write(f"👤 **{u.get('nombre')}** | Usuario: {u.get('usuario')} | Rol: {rol_actual}")
-    except Exception as e:
-        st.error("No se pudieron cargar los usuarios.")
+        st.divider()
+        st.subheader("🛠️ Usuarios Existentes")
+        try:
+            usuarios = supabase.table("usuarios").select("*").execute().data
+            if usuarios:
+                for u in usuarios:
+                    rol_actual = u.get('rol_id') or u.get('rol') or 'Sin rol'
+                    st.write(f"👤 **{u.get('nombre')}** | Usuario: `{u.get('usuario')}` | Rol: **{rol_actual}**")
+            else:
+                st.info("No hay usuarios registrados.")
+        except Exception as e:
+            st.error("No se pudieron cargar los usuarios.")

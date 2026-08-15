@@ -26,7 +26,7 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     return supabase.storage.from_(bucket).get_public_url(path)
 
 # ==========================================
-# AUTENTICACIÓN Y ROLES (PRIMERO)
+# AUTENTICACIÓN Y ROLES
 # ==========================================
 st.sidebar.title("🔐 Control de Acceso")
 usuario = st.sidebar.text_input("Usuario")
@@ -105,6 +105,7 @@ with tab1:
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write(f"**Cliente:** {o['nombre_cliente']} | **Área:** {o['area_produccion']}")
+                    st.write(f"**Fecha de Entrega:** 📅 {o.get('fecha_entrega', 'No especificada')}")
                     st.write(f"**Creado por:** {o.get('creado_por', 'N/A')}")
                     if o.get("archivo_diseno"):
                         st.markdown(f"[🔗 Ver Archivo Diseño]({o['archivo_diseno']})")
@@ -112,6 +113,7 @@ with tab1:
                 estado = o["estado_actual"]
                 nuevo_estado = estado
 
+                # Botones de flujo normales
                 if estado == "Creada / Pendiente de Diseño" and rol_seleccionado in ["Administrador", "Recepción", "Diseñador"]:
                     if st.button("🟢 Enviar a Recepción", key=f"btn_{o['id']}"): nuevo_estado = "Enviado a Recepción"
                 elif estado == "Enviado a Recepción" and rol_seleccionado in ["Administrador", "Recepción"]:
@@ -128,6 +130,11 @@ with tab1:
                 elif estado in ["Completado", "Enviado a Recepción"] and rol_seleccionado in ["Administrador", "Recepción"]:
                     if st.button("🟢 Marcar como Entregado", key=f"btn_{o['id']}"): nuevo_estado = "Entregado"
 
+                # Opción de cancelar orden para Admin, Recepción y Diseñador
+                if estado != "Cancelado" and rol_seleccionado in ["Administrador", "Recepción", "Diseñador"]:
+                    if st.button("❌ Cancelar Orden", key=f"cancel_{o['id']}"):
+                        nuevo_estado = "Cancelado"
+
                 if nuevo_estado != estado:
                     supabase.table("ordenes").update({"estado_actual": nuevo_estado}).eq("id", o["id"]).execute()
                     try:
@@ -143,6 +150,7 @@ with tab2:
         nombre_cliente = st.text_input("Nombre del Cliente")
         nombre_orden = st.text_input("Nombre de la Orden")
         area_produccion = st.selectbox("Área", ["Bordados", "Impresion"])
+        fecha_entrega = st.date_input("Fecha de Entrega Estimada")
         archivos = st.file_uploader("Diseños", accept_multiple_files=True)
         
         if st.form_submit_button("Crear"):
@@ -152,9 +160,13 @@ with tab2:
             urls = [subir_a_supabase(f.getvalue(), f.name) for f in archivos] if archivos else []
             supabase.table("ordenes").insert({
                 "numero_orden": f"ORD-{num_formateado}",
-                "nombre_cliente": nombre_cliente, "nombre_orden": nombre_orden,
-                "area_produccion": area_produccion, "estado_actual": "Creada / Pendiente de Diseño",
-                "archivo_diseno": ",".join(urls), "creado_por": usuario
+                "nombre_cliente": nombre_cliente, 
+                "nombre_orden": nombre_orden,
+                "area_produccion": area_produccion, 
+                "fecha_entrega": str(fecha_entrega),
+                "estado_actual": "Creada / Pendiente de Diseño",
+                "archivo_diseno": ",".join(urls), 
+                "creado_por": usuario
             }).execute()
             st.success(f"Orden ORD-{num_formateado} creada con éxito")
             st.rerun()

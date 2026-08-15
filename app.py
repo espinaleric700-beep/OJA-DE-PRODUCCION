@@ -96,7 +96,8 @@ with tabs[0]:
         if ordenes:
             for o in ordenes:
                 area_orden = o.get('area_produccion', 'General')
-                estado_actual = o.get('estado', 'Pendiente')
+                # Soportar tanto 'estado' como 'estado_actual' por compatibilidad
+                estado_actual = o.get('estado') or o.get('estado_actual') or 'Pendiente'
                 num_orden = o.get('numero_orden', 'N/A')
                 cliente = o.get('nombre_cliente', 'General')
                 nombre_ord = o.get('nombre_orden', 'Sin detalles')
@@ -110,7 +111,10 @@ with tabs[0]:
                     if rol_lower == "diseñador" and estado_actual == "Pendiente":
                         if st.button("📤 Enviar a Recepción", key=f"btn_dis_{o.get('id')}"):
                             try:
-                                supabase.table("ordenes").update({"estado": "Enviado a Recepción"}).eq("id", o.get("id")).execute()
+                                supabase.table("ordenes").update({
+                                    "estado": "Enviado a Recepción",
+                                    "estado_actual": "Enviado a Recepción"
+                                }).eq("id", o.get("id")).execute()
                                 st.success("✅ Orden enviada a recepción.")
                                 st.rerun()
                             except Exception as ex:
@@ -125,7 +129,10 @@ with tabs[0]:
                         if estado_actual in ["Enviado a Recepción", "Pendiente"]:
                             if st.button("🚀 Enviar a Producción", key=f"btn_prod_{o.get('id')}"):
                                 try:
-                                    supabase.table("ordenes").update({"estado": "En Producción"}).eq("id", o.get("id")).execute()
+                                    supabase.table("ordenes").update({
+                                        "estado": "En Producción",
+                                        "estado_actual": "En Producción"
+                                    }).eq("id", o.get("id")).execute()
                                     st.success("✅ Orden enviada a producción.")
                                     st.rerun()
                                 except Exception as ex:
@@ -134,7 +141,10 @@ with tabs[0]:
                         if estado_actual == "En Producción":
                             if es_almacen and st.button("✔️ Marcar Listo (Almacén)", key=f"btn_alm_{o.get('id')}"):
                                 try:
-                                    supabase.table("ordenes").update({"estado": "Regresado a Recepción"}).eq("id", o.get("id")).execute()
+                                    supabase.table("ordenes").update({
+                                        "estado": "Regresado a Recepción",
+                                        "estado_actual": "Regresado a Recepción"
+                                    }).eq("id", o.get("id")).execute()
                                     st.success("✅ Almacén actualizado. Orden devuelta a Recepción.")
                                     st.rerun()
                                 except Exception as ex:
@@ -142,7 +152,10 @@ with tabs[0]:
 
                             if es_produccion_area and st.button("🏁 Marcar Completado (Producción)", key=f"btn_comp_{o.get('id')}"):
                                 try:
-                                    supabase.table("ordenes").update({"estado": "Regresado a Recepción"}).eq("id", o.get("id")).execute()
+                                    supabase.table("ordenes").update({
+                                        "estado": "Regresado a Recepción",
+                                        "estado_actual": "Regresado a Recepción"
+                                    }).eq("id", o.get("id")).execute()
                                     st.success("✅ Producción completada. Orden devuelta a Recepción.")
                                     st.rerun()
                                 except Exception as ex:
@@ -165,6 +178,7 @@ with tabs[0]:
                                 
                                 supabase.table("ordenes").update({
                                     "estado": "Orden Entregada",
+                                    "estado_actual": "Orden Entregada",
                                     "factura_url": factura_url
                                 }).eq("id", o.get("id")).execute()
                                 st.success("🎉 ¡Orden marcada como entregada con éxito!")
@@ -227,16 +241,17 @@ with tabs[1]:
                     
                     archivos_str = ",".join(urls_archivos)
                     
-                    # Generamos un número de orden automático (ej: ORD-20260815...)
                     num_orden_auto = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
                     
+                    # Incluimos tanto 'estado' como 'estado_actual' para evitar restricciones NOT-NULL
                     supabase.table("ordenes").insert({
                         "numero_orden": num_orden_auto,
                         "nombre_cliente": cliente,
                         "nombre_orden": nombre_ord,
                         "area_produccion": area,
                         "imagen_url": archivos_str,
-                        "estado": "Pendiente"
+                        "estado": "Pendiente",
+                        "estado_actual": "Pendiente"
                     }).execute()
                     st.success("✅ Orden creada con éxito.")
                 except Exception as e:

@@ -158,13 +158,14 @@ with tabs[0]:
                         with st.expander("🕒 Ver historial de cambios de estado"):
                             historial_texto = o.get('historial')
                             if historial_texto:
-                                st.markdown(historial_texto)
+                                # Forzar separación con saltos de línea garantizados para que aparezca uno debajo de otro
+                                historial_lineas = historial_texto.replace("• ", "\n• ")
+                                st.markdown(historial_lineas)
                             else:
                                 st.info("No hay cambios registrados en el historial para esta orden.")
 
                 with col_der:
                     with st.form(f"form_quick_{o.get('id')}"):
-                        # Distribución en columnas internas: Selector de estado a la izquierda y Botón actualizar a la derecha
                         col_sel, col_btn = st.columns([2, 1])
                         with col_sel:
                             nuevo_estado = st.selectbox(
@@ -181,6 +182,7 @@ with tabs[0]:
                             fecha_hora_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                             usuario_actual = st.session_state['usuario']
                             
+                            # Se añade explícitamente el salto de línea al concatenar un nuevo registro en el historial
                             nuevo_registro = f"• Estado: **{nuevo_estado}** | Usuario: `{usuario_actual}` | Fecha: {fecha_hora_str}"
                             historial_previo = o.get('historial') or ""
                             historial_actualizado = f"{nuevo_registro}\n{historial_previo}" if historial_previo else nuevo_registro

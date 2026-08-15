@@ -7,7 +7,6 @@ from supabase import create_client
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
-# Asegúrate de tener los secrets configurados en Streamlit
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -18,7 +17,6 @@ roles_por_defecto = [
     "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"
 ]
 
-# Intentamos obtener roles actualizados desde la DB
 roles_disponibles = roles_por_defecto
 try:
     res_roles = supabase.table("rol").select("id").execute()
@@ -43,23 +41,32 @@ if not st.session_state["autenticado"]:
     password_input = st.sidebar.text_input("Contraseña", type="password")
     
     if st.sidebar.button("Iniciar Sesión"):
-        try:
-            res = supabase.table("usuarios").select("*").execute()
-            usuario_encontrado = None
-            for u in res.data:
-                if str(u.get("usuario") or "").lower() == usuario_input.strip().lower() and str(u.get("password") or "") == str(password_input):
-                    usuario_encontrado = u
-                    break
-            
-            if usuario_encontrado:
-                st.session_state["autenticado"] = True
-                st.session_state["usuario"] = usuario_input
-                st.session_state["rol"] = usuario_encontrado.get("rol", "")
-                st.rerun()
-            else:
-                st.sidebar.error("❌ Usuario o contraseña incorrectos.")
-        except Exception as e:
-            st.sidebar.error(f"Error de conexión: {e}")
+        if not usuario_input or not password_input:
+            st.sidebar.warning("Por favor ingresa usuario y contraseña.")
+        # Acceso maestro de administrador directo
+        elif usuario_input.strip().lower() == "admin" and password_input == "2580Admin":
+            st.session_state["autenticado"] = True
+            st.session_state["usuario"] = "admin"
+            st.session_state["rol"] = "Administrador"
+            st.rerun()
+        else:
+            try:
+                res = supabase.table("usuarios").select("*").execute()
+                usuario_encontrado = None
+                for u in res.data:
+                    if str(u.get("usuario") or "").lower() == usuario_input.strip().lower() and str(u.get("password") or "") == str(password_input):
+                        usuario_encontrado = u
+                        break
+                
+                if usuario_encontrado:
+                    st.session_state["autenticado"] = True
+                    st.session_state["usuario"] = usuario_input
+                    st.session_state["rol"] = usuario_encontrado.get("rol", "")
+                    st.rerun()
+                else:
+                    st.sidebar.error("❌ Usuario o contraseña incorrectos.")
+            except Exception as e:
+                st.sidebar.error(f"Error de conexión: {e}")
     st.stop()
 
 # ==========================================
@@ -80,7 +87,6 @@ with tabs[2]: # Pestaña de Configuración
         
         if st.form_submit_button("Guardar Usuario"):
             try:
-                # Se inserta en la columna 'rol' (text)
                 supabase.table("usuarios").insert({
                     "nombre": n_nombre, 
                     "usuario": n_user, 

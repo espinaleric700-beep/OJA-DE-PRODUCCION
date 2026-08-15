@@ -173,7 +173,7 @@ with tabs[2]:
     puede_modificar = st.session_state['rol'] in ["Administrador", "Recepción", "Almacén"]
 
     if puede_modificar:
-        with st.expander("➕ Agregar Nuevo Producto al Inventario", expanded=True):
+        with st.expander("➕ Agregar Nuevo Producto al Inventario", expanded=False):
             inv_nombre = st.text_input("Nombre de la Prenda (Ej. Camiseta Ojo de Ángel)", key="input_nombre_prenda")
             foto_prenda = st.file_uploader("Foto de la Prenda", type=["png", "jpg", "jpeg"], key="input_foto_prenda")
             
@@ -236,12 +236,23 @@ with tabs[2]:
             for item in inventario_db:
                 item_id = item.get("id")
                 p_nombre = item.get("nombre_producto", "Sin nombre")
-                p_tallas = item.get("tallas_existencias", "No especificado")
+                p_tallas_str = item.get("tallas_existencias", "")
                 p_imagen = item.get("imagen_url", "")
+
+                # Parsear tallas a diccionario para manipulación rápida
+                dict_tallas = {}
+                if p_tallas_str:
+                    for part in p_tallas_str.split(","):
+                        if ":" in part:
+                            t_key, t_val = part.split(":", 1)
+                            try:
+                                dict_tallas[t_key.strip()] = int(t_val.strip())
+                            except:
+                                pass
 
                 with st.container():
                     st.markdown(f"### 🏷️ {p_nombre}")
-                    col_img, col_info = st.columns([1, 2])
+                    col_img, col_info = st.columns([1, 2.5])
                     
                     with col_img:
                         if p_imagen:
@@ -251,19 +262,42 @@ with tabs[2]:
                             
                     with col_info:
                         st.markdown("#### 📏 Tallas y Existencias:")
-                        if p_tallas:
-                            for t_info in p_tallas.split(","):
-                                if ":" in t_info:
-                                    talla, cantidad = t_info.split(":", 1)
-                                    st.markdown(f"- **Talla {talla.strip()}:** `{cantidad.strip()} unidades`")
-                                else:
-                                    st.markdown(f"- {t_info.strip()}")
+                        
+                        if dict_tallas:
+                            # Organizar en columnas horizontales (ej. 4 columnas por fila)
+                            cols_por_fila = 4
+                            tallas_items = list(dict_tallas.items())
+                            
+                            for i in range(0, len(tallas_items), cols_por_fila):
+                                fila_cols = st.columns(cols_por_fila)
+                                for j in range(cols_por_fila):
+                                    if i + j < len(tallas_items):
+                                        talla, cantidad = tallas_items[i + j]
+                                        with fila_cols[j]:
+                                            st.markdown(f"**Talla {talla}**")
+                                            st.markdown(f"`{cantidad} un.`")
+                                            
+                                            if puede_modificar:
+                                                c_menos, c_mas = st.columns(2)
+                                                if c_menos.button("➖", key=f"m_{item_id}_{talla}"):
+                                                    if cantidad > 0:
+                                                        dict_tallas[talla] = cantidad - 1
+                                                        nuevo_str = ", ".join([f"{tk}: {tv}" for tk, tv in dict_tallas.items()])
+                                                        supabase.table("almacen").update({"tallas_existencias": nuevo_str}).eq("id", item_id).execute()
+                                                        st.rerun()
+                                                if c_mas.button("➕", key=f"p_{item_id}_{talla}"):
+                                                    dict_tallas[talla] = cantidad + 1
+                                                    nuevo_str = ", ".join([f"{tk}: {tv}" for tk, tv in dict_tallas.items()])
+                                                    supabase.table("almacen").update({"tallas_existencias": nuevo_str}).eq("id", item_id).execute()
+                                                    st.rerun()
+                        else:
+                            st.info("No hay tallas definidas.")
                         
                         if puede_modificar:
-                            with st.expander("🛠️ Modificar o Eliminar este producto"):
+                            with st.expander("🛠️ Opciones Avanzadas (Editar texto completo o Eliminar producto)"):
                                 with st.form(f"form_edit_inv_{item_id}"):
                                     edit_nombre = st.text_input("Nombre de la Prenda", value=p_nombre, key=f"inv_n_{item_id}")
-                                    edit_tallas = st.text_area("Tallas y Cantidades (Formato: S: 10, M: 15)", value=p_tallas, key=f"inv_t_{item_id}")
+                                    edit_tallas = st.text_area("Tallas y Cantidades (Formato: S: 10, M: 15)", value=p_tallas_str, key=f"inv_t_{item_id}")
                                     
                                     col_act, col_del = st.columns(2)
                                     btn_act = col_act.form_submit_button("💾 Guardar Cambios")

@@ -27,7 +27,7 @@ SUPABASE_KEY = st.secrets["supabase"]["key"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==========================================
-# ROLES DISPONIBLES (SEGURO)
+# ROLES Y ESTADOS DISPONIBLES
 # ==========================================
 roles_disponibles = [
     "Administrador", 
@@ -37,6 +37,15 @@ roles_disponibles = [
     "Producción - Bordados", 
     "Producción - Impresión", 
     "Producción - Transferencia Térmica"
+]
+
+lista_estados = [
+    "Pendiente", 
+    "Recepción", 
+    "Producción - Bordados", 
+    "Producción - Impresión", 
+    "Producción - Transferencia Térmica", 
+    "Orden Entregada"
 ]
 
 def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
@@ -85,16 +94,26 @@ with tabs[0]:
     st.subheader("📋 Listado y Control de Órdenes")
     try:
         ordenes = supabase.table("ordenes").select("*").execute().data
-        lista_estados = ["Pendiente", "Enviado a Recepción", "En Producción", "Regresado a Recepción", "Orden Entregada"]
         estados_filtro = st.multiselect("Filtrar por estado:", lista_estados, default=[])
         
         if ordenes:
             ordenes_a_mostrar = [o for o in ordenes if (o.get('estado') or o.get('estado_actual')) in estados_filtro] if estados_filtro else ordenes
             for o in ordenes_a_mostrar:
                 estado_actual = o.get('estado') or o.get('estado_actual') or 'Pendiente'
+                
+                color_map = {
+                    "Pendiente": "🟡",
+                    "Recepción": "🔵",
+                    "Producción - Bordados": "🟠",
+                    "Producción - Impresión": "🟣",
+                    "Producción - Transferencia Térmica": "🟤",
+                    "Orden Entregada": "🟢"
+                }
+                icono_estado = color_map.get(estado_actual, "⚪")
+
                 col_izq, col_der = st.columns([3, 1])
                 with col_izq:
-                    with st.expander(f"Orden #{o.get('numero_orden', 'N/A')} - {o.get('nombre_cliente', 'N/A')} | Estado: {estado_actual}"):
+                    with st.expander(f"{icono_estado} Orden #{o.get('numero_orden', 'N/A')} - {o.get('nombre_cliente', 'N/A')} | Estado: {estado_actual}"):
                         st.write(f"**Área:** {o.get('area_produccion', 'N/A')} | **Detalles:** {o.get('nombre_orden', 'N/A')}")
                         if o.get('factura_url'): st.markdown(f"📄 [Ver Factura]({o.get('factura_url')})")
                 with col_der:
@@ -110,13 +129,13 @@ with tabs[1]:
     with st.form("form_nueva_orden", clear_on_submit=True):
         cliente = st.text_input("Nombre del Cliente")
         nombre_ord = st.text_input("Nombre de la Orden")
-        area = st.selectbox("Área", ["Bordados", "Impresion"])
+        area = st.selectbox("Área", roles_disponibles[4:]) # Permite seleccionar áreas de producción
         fecha_entrega = st.date_input("Fecha de Entrega")
         if st.form_submit_button("Guardar Orden"):
             num_auto = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
             supabase.table("ordenes").insert({
                 "numero_orden": num_auto, "nombre_cliente": cliente, "nombre_orden": nombre_ord,
-                "area_produccion": area, "fecha_entrega": str(fecha_entrega), "estado": "Pendiente"
+                "area_produccion": area, "fecha_entrega": str(fecha_entrega), "estado": "Pendiente", "estado_actual": "Pendiente"
             }).execute()
             st.success("✅ Orden creada.")
 

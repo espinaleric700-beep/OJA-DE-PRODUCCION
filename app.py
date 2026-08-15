@@ -149,8 +149,12 @@ with tabs[0]:
                 col_izq, col_der = st.columns([3, 1])
                 
                 with col_izq:
-                    with st.expander(f"{icono_estado} Orden #{o.get('numero_orden', 'N/A')} - Cliente: {o.get('nombre_cliente', 'N/A')} | Estado: {estado_actual}"):
+                    # Se incluye la fecha de entrega en el expander si está registrada
+                    fecha_entrega_str = f" | 📅 Entrega: {o.get('fecha_entrega')}" if o.get('fecha_entrega') else ""
+                    with st.expander(f"{icono_estado} Orden #{o.get('numero_orden', 'N/A')} - Cliente: {o.get('nombre_cliente', 'N/A')}{fecha_entrega_str} | Estado: {estado_actual}"):
                         st.write(f"**Área:** {o.get('area_produccion', 'N/A')} | **Detalles:** {o.get('nombre_orden', 'N/A')}")
+                        if o.get('fecha_entrega'):
+                            st.write(f"**Fecha de Entrega Programada:** {o.get('fecha_entrega')}")
                         
                         if o.get('factura_url'):
                             st.markdown(f"📄 [Ver Factura]({o.get('factura_url')})")
@@ -158,7 +162,6 @@ with tabs[0]:
                         with st.expander("🕒 Ver historial de cambios de estado"):
                             historial_texto = o.get('historial')
                             if historial_texto:
-                                # Forzar separación con saltos de línea garantizados para que aparezca uno debajo de otro
                                 historial_lineas = historial_texto.replace("• ", "\n• ")
                                 st.markdown(historial_lineas)
                             else:
@@ -182,7 +185,6 @@ with tabs[0]:
                             fecha_hora_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                             usuario_actual = st.session_state['usuario']
                             
-                            # Se añade explícitamente el salto de línea al concatenar un nuevo registro en el historial
                             nuevo_registro = f"• Estado: **{nuevo_estado}** | Usuario: `{usuario_actual}` | Fecha: {fecha_hora_str}"
                             historial_previo = o.get('historial') or ""
                             historial_actualizado = f"{nuevo_registro}\n{historial_previo}" if historial_previo else nuevo_registro
@@ -208,6 +210,7 @@ with tabs[1]:
         cliente = st.text_input("Nombre del Cliente")
         nombre_ord = st.text_input("Nombre de la Orden / Detalles")
         area = st.selectbox("Área", ["Bordados", "Impresion"])
+        fecha_entrega = st.date_input("Fecha de Entrega")
         archivos = st.file_uploader("Subir Archivos", accept_multiple_files=True)
         
         if st.form_submit_button("Guardar Orden"):
@@ -220,6 +223,7 @@ with tabs[1]:
                     "nombre_cliente": cliente,
                     "nombre_orden": nombre_ord,
                     "area_produccion": area,
+                    "fecha_entrega": str(fecha_entrega),
                     "imagen_url": ",".join(urls),
                     "estado": "Pendiente",
                     "estado_actual": "Pendiente",

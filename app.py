@@ -130,7 +130,9 @@ with tab1:
           st.write(f"**Nombre de Referencia:** {o['nombre_orden']}")
           st.write(f"**Área:** {o['area_produccion']}")
           st.write(f"**Fecha Creación:** {o['fecha_creacion']}")
-          st.write(f"**Fecha Entrega:** {o['fecha_entrega']}")
+          st.write(
+              f"**Fecha Entrega:** {o.get('fecha_entrega', 'No asignada')}"
+          )
           if rol_seleccionado in ["Administrador", "Recepción"]:
             st.info(f"**Nota Interna:** {o.get('nota_interna', 'Ninguna')}")
 
@@ -138,7 +140,6 @@ with tab1:
           # Mostrar múltiples archivos de diseño si existen
           if o.get("archivo_diseno"):
             st.markdown("**Archivos de Diseño:**")
-            # Soportar tanto texto separado por comas como string único antiguo
             archivos = o["archivo_diseno"].split(",")
             for idx, url in enumerate(archivos):
               if url.strip():
@@ -245,12 +246,18 @@ with tab2:
     area_produccion = st.selectbox(
         "Área de Producción", ["Bordados", "Impresion"]
     )
-    fecha_entrega = st.date_input("Fecha estimada de entrega")
+
+    # La fecha estimada de entrega solo se muestra si el rol es Administrador o Recepción
+    fecha_entrega = None
+    if rol_seleccionado in ["Administrador", "Recepción"]:
+      fecha_entrega = st.date_input(
+          "Fecha estimada de entrega (Solo Admin y Recepción)"
+      )
+
     nota_interna = st.text_area(
         "Nota Interna (Solo Admin y Recepción)"
     )
 
-    # Permitir múltiples archivos de diseño
     archivos_subidos = st.file_uploader(
         "Subir Archivos de Diseño (Puedes seleccionar varios: .emb, .dst, .cdr,"
         " .ai, .pdf, etc.)",
@@ -269,7 +276,6 @@ with tab2:
         accept_multiple_files=True,
     )
 
-    # El recibo de pago solo se muestra si el rol es Administrador o Recepción
     recibo_subido = None
     if rol_seleccionado in ["Administrador", "Recepción"]:
       recibo_subido = st.file_uploader(
@@ -284,7 +290,6 @@ with tab2:
         urls_diseno = []
         url_recibo = ""
 
-        # Subir múltiples archivos de diseño
         if archivos_subidos:
           for archivo in archivos_subidos:
             url = subir_a_firebase(
@@ -292,7 +297,6 @@ with tab2:
             )
             urls_diseno.append(url)
 
-        # Subir recibo de pago si fue cargado por Admin o Recepción
         if recibo_subido and rol_seleccionado in ["Administrador", "Recepción"]:
           url_recibo = subir_a_firebase(
               recibo_subido.getvalue(), recibo_subido.name, "recibos/"
@@ -307,7 +311,9 @@ with tab2:
             "area_produccion": area_produccion,
             "estado_actual": "Creada / Pendiente de Diseño",
             "fecha_creacion": datetime.now().isoformat(),
-            "fecha_entrega": str(fecha_entrega),
+            "fecha_entrega": (
+                str(fecha_entrega) if fecha_entrega else None
+            ),
             "nota_interna": nota_interna,
             "archivo_diseno": ",".join(urls_diseno),
             "recibo_pago": url_recibo,

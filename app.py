@@ -254,7 +254,6 @@ with tabs[2]:
                                         with sub2:
                                             st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #f3f4f6;'>{cant_str}</span></div>", unsafe_allow_html=True)
                                         with sub3:
-                                            # Claves totalmente únicas y blindadas por producto, color y talla
                                             if st.button("➕", key=f"sum_{item_id}_{color_sel}_{talla}"):
                                                 dict_colores[color_sel]["tallas"][talla] = cantidad + 1
                                                 supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
@@ -271,8 +270,70 @@ with tabs[2]:
                 else:
                     st.warning("⚠️ Este producto no tiene formato de colores estructurado o contiene datos inválidos.")
 
+                # --- NUEVA OPCIÓN: Gestionar Colores / Imagen directamente en el producto ---
                 if puede_modificar:
-                    if st.button("🗑️ Eliminar Producto", key=f"del_prod_item_{item_id}"):
+                    with st.expander(f"🛠️ Gestionar Colores e Imagen de: {p_nombre}"):
+                        st.markdown("#### 🖼️ Cambiar o Subir Imagen para el Color Actual (`" + color_sel + "`)")
+                        nueva_img_file = st.file_uploader(f"Nueva imagen para `{color_sel}`", type=["png", "jpg", "jpeg"], key=f"up_img_prod_{item_id}_{color_sel}")
+                        if st.button("💾 Guardar Nueva Imagen", key=f"btn_save_img_{item_id}_{color_sel}"):
+                            if nueva_img_file is not None:
+                                try:
+                                    url_subida = subir_a_supabase(nueva_img_file.getvalue(), nueva_img_file.name)
+                                    dict_colores[color_sel]["imagen_url"] = url_subida
+                                    supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                    st.success("✅ ¡Imagen actualizada con éxito!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error al subir imagen: {e}")
+                            else:
+                                st.warning("Selecciona una imagen primero.")
+                        
+                        st.markdown("---")
+                        st.markdown("#### ➕ Agregar Nuevo Color a este Producto")
+                        col_nuevo_n, col_nuevo_hex = st.columns([2, 1])
+                        with col_nuevo_n:
+                            val_nuevo_c_nombre = st.text_input("Nombre del nuevo color", key=f"add_col_name_{item_id}")
+                        with col_nuevo_hex:
+                            val_nuevo_c_hex = st.color_picker("Color", "#3b82f6", key=f"add_col_hex_{item_id}")
+                        
+                        file_nuevo_c = st.file_uploader(f"Imagen para el nuevo color", type=["png", "jpg", "jpeg"], key=f"add_col_file_{item_id}")
+                        
+                        if st.button("➕ Añadir Color al Producto", key=f"btn_add_col_prod_{item_id}"):
+                            c_clean_new = val_nuevo_c_nombre.strip()
+                            if c_clean_new:
+                                if c_clean_new not in dict_colores:
+                                    url_new_col = ""
+                                    if file_nuevo_c is not None:
+                                        url_new_col = subir_a_supabase(file_nuevo_c.getvalue(), file_nuevo_c.name)
+                                    
+                                    dict_colores[c_clean_new] = {
+                                        "tallas": {t: 0 for t in tallas_disponibles},
+                                        "imagen_url": url_new_col,
+                                        "hex": val_nuevo_c_hex
+                                    }
+                                    supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                    st.success(f"✅ Color '{c_clean_new}' añadido correctamente.")
+                                    st.session_state[key_activo] = c_clean_new
+                                    st.rerun()
+                                else:
+                                    st.warning("Este color ya existe en el producto.")
+                            else:
+                                st.error("Ingresa un nombre válido para el color.")
+
+                        if len(dict_colores) > 1:
+                            st.markdown("---")
+                            st.markdown("#### 🗑️ Eliminar un Color")
+                            color_a_borrar = st.selectbox("Selecciona color a eliminar", list(dict_colores.keys()), key=f"sel_del_col_{item_id}")
+                            if st.button("🗑️ Eliminar Color Seleccionado", key=f"btn_del_col_{item_id}_{color_a_borrar}"):
+                                del dict_colores[color_a_borrar]
+                                supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                st.success(f"⚠️ Color '{color_a_borrar}' eliminado.")
+                                st.session_state[key_activo] = list(dict_colores.keys())[0]
+                                st.rerun()
+                        else:
+                            st.info("ℹ️ El producto debe tener al menos un color.")
+
+                    if st.button("🗑️ Eliminar Producto Completo", key=f"del_prod_item_{item_id}"):
                         supabase.table("almacen").delete().eq("id", item_id).execute()
                         st.warning("⚠️ Producto eliminado.")
                         st.rerun()

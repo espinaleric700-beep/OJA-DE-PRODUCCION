@@ -287,11 +287,10 @@ with tabs[2]:
                             st.session_state[key_activo] = lista_cols[0]
 
                         st.markdown("Colores")
-                        st.markdown(f'<div id="anchor_colores_{item_id}"></div>', unsafe_allow_html=True)
 
-                        # Renderizamos los botones en contenedor compacto tipo Flexbox (sin ocupar todo el ancho)
+                        # Contenedor Flexbox compacto con ancho adaptado
                         html_botones = f"""
-                        <div id="flex_colors_{item_id}" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; align-items: center;">
                         """
                         for i, c_name in enumerate(lista_cols):
                             c_hex = dict_colores[c_name].get("hex", "#3b82f6")
@@ -301,25 +300,27 @@ with tabs[2]:
                             shadow_estilo = f"0 0 10px {c_hex}" if es_sel else "none"
                             
                             html_botones += f"""
-                            <button onclick="window.location.href='?sel_col_{item_id}={c_name}'" style="
-                                background-color: {c_hex} !important;
-                                color: {txt_col} !important;
-                                border: {borde_estilo} !important;
-                                box-shadow: {shadow_estilo} !important;
-                                font-weight: bold !important;
-                                padding: 8px 16px !important;
-                                border-radius: 6px !important;
-                                cursor: pointer !important;
-                                min-width: 120px !important;
-                                max-width: 180px !important;
-                                font-size: 0.9rem !important;
-                                text-transform: uppercase !important;
-                            ">{c_name}</button>
+                            <a href="?sel_col_{item_id}={c_name}" target="_self" style="text-decoration: none;">
+                                <button style="
+                                    background-color: {c_hex} !important;
+                                    color: {txt_col} !important;
+                                    border: {borde_estilo} !important;
+                                    box-shadow: {shadow_estilo} !important;
+                                    font-weight: bold !important;
+                                    padding: 6px 12px !important;
+                                    border-radius: 6px !important;
+                                    cursor: pointer !important;
+                                    font-size: 0.85rem !important;
+                                    text-transform: uppercase !important;
+                                    white-space: nowrap !important;
+                                ">{c_name}</button>
+                            </a>
                             """
                         html_botones += "</div>"
+                        
+                        # ¡CORRECCIÓN CLAVE AQUÍ: unsafe_allow_html=True!
                         st.markdown(html_botones, unsafe_allow_html=True)
 
-                        # Manejo de selección por query params nativo de Streamlit
                         query_params = st.query_params
                         param_key = f"sel_col_{item_id}"
                         if param_key in query_params:

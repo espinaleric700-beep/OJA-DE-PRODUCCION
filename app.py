@@ -239,7 +239,6 @@ with tabs[2]:
                 p_tallas_str = item.get("tallas_existencias", "")
                 p_imagen = item.get("imagen_url", "")
 
-                # Parsear tallas a diccionario para manipulación rápida
                 dict_tallas = {}
                 if p_tallas_str:
                     for part in p_tallas_str.split(","):
@@ -252,7 +251,7 @@ with tabs[2]:
 
                 with st.container():
                     st.markdown(f"### 🏷️ {p_nombre}")
-                    col_img, col_info = st.columns([1, 2.5])
+                    col_img, col_info = st.columns([1, 3])
                     
                     with col_img:
                         if p_imagen:
@@ -264,8 +263,8 @@ with tabs[2]:
                         st.markdown("#### 📏 Tallas y Existencias:")
                         
                         if dict_tallas:
-                            # Organizar en columnas horizontales (ej. 4 columnas por fila)
-                            cols_por_fila = 4
+                            # 6 columnas por fila para aprovechar el ancho horizontal eficientemente
+                            cols_por_fila = 6
                             tallas_items = list(dict_tallas.items())
                             
                             for i in range(0, len(tallas_items), cols_por_fila):
@@ -274,22 +273,24 @@ with tabs[2]:
                                     if i + j < len(tallas_items):
                                         talla, cantidad = tallas_items[i + j]
                                         with fila_cols[j]:
-                                            st.markdown(f"**Talla {talla}**")
-                                            st.markdown(f"`{cantidad} un.`")
+                                            st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 6px; border: 1px solid #1f2937; text-align: center;'><b>{talla}</b><br><span style='font-size: 1.1em; color: #60a5fa;'>{cantidad}</span></div>", unsafe_allow_html=True)
                                             
                                             if puede_modificar:
-                                                c_menos, c_mas = st.columns(2)
-                                                if c_menos.button("➖", key=f"m_{item_id}_{talla}"):
-                                                    if cantidad > 0:
-                                                        dict_tallas[talla] = cantidad - 1
+                                                sub_c1, sub_c2 = st.columns(2)
+                                                with sub_c1:
+                                                    if st.button("➖", key=f"m_{item_id}_{talla}"):
+                                                        if cantidad > 0:
+                                                            dict_tallas[talla] = cantidad - 1
+                                                            nuevo_str = ", ".join([f"{tk}: {tv}" for tk, tv in dict_tallas.items()])
+                                                            supabase.table("almacen").update({"tallas_existencias": nuevo_str}).eq("id", item_id).execute()
+                                                            st.rerun()
+                                                with sub_c2:
+                                                    if st.button("➕", key=f"p_{item_id}_{talla}"):
+                                                        dict_tallas[talla] = cantidad + 1
                                                         nuevo_str = ", ".join([f"{tk}: {tv}" for tk, tv in dict_tallas.items()])
                                                         supabase.table("almacen").update({"tallas_existencias": nuevo_str}).eq("id", item_id).execute()
                                                         st.rerun()
-                                                if c_mas.button("➕", key=f"p_{item_id}_{talla}"):
-                                                    dict_tallas[talla] = cantidad + 1
-                                                    nuevo_str = ", ".join([f"{tk}: {tv}" for tk, tv in dict_tallas.items()])
-                                                    supabase.table("almacen").update({"tallas_existencias": nuevo_str}).eq("id", item_id).execute()
-                                                    st.rerun()
+                                        st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)
                         else:
                             st.info("No hay tallas definidas.")
                         

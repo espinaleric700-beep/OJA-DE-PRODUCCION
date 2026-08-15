@@ -41,6 +41,7 @@ if not st.session_state["autenticado"]:
     if st.sidebar.button("Iniciar Sesión"):
         if not usuario_input or not password_input:
             st.sidebar.warning("Por favor ingresa usuario y contraseña.")
+        # Acceso maestro de respaldo para el Administrador
         elif rol_input == "Administrador" and usuario_input.strip().lower() == "admin" and password_input == "2580Admin" and clave_admin == "2580Admin":
             st.session_state["autenticado"] = True
             st.session_state["usuario"] = "admin"
@@ -58,14 +59,17 @@ if not st.session_state["autenticado"]:
                     limpio_input = usuario_input.strip().lower()
                     
                     for u in usuarios_db:
-                        if str(u.get("usuario", "")).strip().lower() == limpio_input:
-                            if str(u.get("password", "")) == str(password_input):
-                                usuario_encontrado = u
-                                break
+                        # Buscamos columnas comunes de usuario (usuario, username, name) y contraseña (password, pass)
+                        db_user = str(u.get("usuario") or u.get("username") or u.get("name") or "").strip().lower()
+                        db_pass = str(u.get("password") or u.get("pass") or "")
+                        
+                        if db_user == limpio_input and db_pass == str(password_input):
+                            usuario_encontrado = u
+                            break
 
                     if usuario_encontrado:
                         st.session_state["autenticado"] = True
-                        st.session_state["usuario"] = usuario_encontrado.get("usuario")
+                        st.session_state["usuario"] = usuario_input
                         st.session_state["rol"] = rol_input
                         st.rerun()
                     else:
@@ -206,9 +210,13 @@ def cargar_panel_principal():
             n_pass = st.text_input("Contraseña", type="password")
             n_rol = st.selectbox("Rol", tab3_roles_disponibles, key="sel_rol_n")
             if st.button("Registrar Usuario"):
-                # Se eliminó la columna "rol" de la inserción para evitar errores con la base de datos actual
-                supabase.table("usuarios").insert({"usuario": n_user, "password": n_pass}).execute()
-                st.success("Registrado con éxito")
+                try:
+                    # Intenta insertar según las columnas comunes de la tabla usuarios
+                    supabase.table("usuarios").insert({"usuario": n_user, "password": n_pass}).execute()
+                    st.success("¡Usuario registrado con éxito en la base de datos!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"No se pudo registrar automáticamente: {e}")
             
             st.markdown("---")
             st.subheader("📊 Historial de Movimientos y Cancelaciones")

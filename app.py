@@ -1,6 +1,6 @@
 from datetime import datetime
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
+import streamlit.components.v1 as components
 from supabase import create_client
 
 # ==========================================
@@ -8,8 +8,17 @@ from supabase import create_client
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
-# Autorrefresco cada 10 segundos (10000 milisegundos)
-st_autorefresh(interval=10000, key="datarefresh")
+# Refresco nativo cada 10 segundos
+components.html(
+    """
+    <script>
+        setTimeout(function(){
+            window.parent.location.reload();
+        }, 10000);
+    </script>
+    """,
+    height=0,
+)
 
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
@@ -21,7 +30,7 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     return supabase.storage.from_(bucket).get_public_url(path)
 
 # ==========================================
-# GESTIÓN DE SESIÓN (Persistente al actualizar)
+# GESTIÓN DE SESIÓN Y AUTENTICACIÓN
 # ==========================================
 if "autenticado" not in st.session_state:
     st.session_state["autenticado"] = False
@@ -45,21 +54,28 @@ if not st.session_state["autenticado"]:
     if st.sidebar.button("Iniciar Sesión"):
         if rol_input == "Administrador" and clave_admin != "2580Admin":
             st.sidebar.error("Clave de Administrador incorrecta.")
-        elif not usuario_input:
-            st.sidebar.warning("Por favor ingresa tu usuario.")
+        elif not usuario_input or not password_input:
+            st.sidebar.warning("Por favor ingresa usuario y contraseña.")
         else:
-            # Guardar estado de sesión
-            st.session_state["autenticado"] = True
-            st.session_state["usuario"] = usuario_input
-            st.session_state["rol"] = rol_input
-            st.rerun()
+            # Consultar en Supabase si el usuario, contraseña y rol coinciden
+            try:
+                res = supabase.table("usuarios").select("*").eq("usuario", usuario_input).eq("password", password_input).eq("rol", rol_input).execute()
+                usuarios_encontrados = res.data
+
+                if usuarios_encontrados:
+                    st.session_state["autenticado"] = True
+                    st.session_state["usuario"] = usuario_input
+                    st.session_state["rol"] = rol_input
+                    st.rerun()
+                else:
+                    st.sidebar.error("❌ Usuario, contraseña o rol incorrectos.")
+            except Exception as e:
+                st.sidebar.error(f"Error al verificar credenciales: {e}")
     st.stop()
 
-# Si ya está autenticado, recuperamos los valores de la sesión
 usuario = st.session_state["usuario"]
 rol_seleccionado = st.session_state["rol"]
 
-# Botón para cerrar sesión en el sidebar
 if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state["autenticado"] = False
     st.session_state["usuario"] = ""
@@ -68,9 +84,6 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
 
 ROLES_AUTORIZADOS_CREAR = ["Administrador", "Recepción", "Diseñador"]
 
-# ==========================================
-# MAPA DE PENDIENTES
-# ==========================================
 mapa_roles = {
     "Recepción": ["Creada / Pendiente de Diseño", "Enviado a Transferencia Térmica"],
     "Diseñador": ["Creada / Pendiente de Diseño"],
@@ -82,15 +95,11 @@ mapa_roles = {
 
 ordenes_db = supabase.table("ordenes").select("*").execute().data
 
-# Alerta sidebar
 if rol_seleccionado in mapa_roles:
     pendientes_sidebar = [o for o in ordenes_db if o["estado_actual"] in mapa_roles[rol_seleccionado] and (not "Producción" in rol_seleccionado or o["area_produccion"] in rol_seleccionado)]
     if pendientes_sidebar:
         st.sidebar.error(f"⚠️ Tienes {len(pendientes_sidebar)} órdenes pendientes.")
 
-# ==========================================
-# PANEL PRINCIPAL
-# ==========================================
 st.title("🧵 Pixel Thread - Gestión de Órdenes")
 busqueda = st.text_input("🔍 Buscador rápido (Número o Cliente)")
 
@@ -132,7 +141,6 @@ with tab1:
                                 else:
                                     st.warning("Escribe un motivo.")
 
-                # BOTONES DE CAMBIO DE ESTADO
                 estado = o["estado_actual"]
                 nuevo_estado = estado
 

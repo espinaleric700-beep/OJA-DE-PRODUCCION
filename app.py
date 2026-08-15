@@ -11,6 +11,11 @@ SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
+    path = f"ordenes/{datetime.now().strftime('%Y%m%d%H%M%S')}_{file_name}"
+    supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "image/jpeg", "upsert": "true"})
+    return supabase.storage.from_(bucket).get_public_url(path)
+
 # Lista por defecto para evitar "No options to select"
 roles_por_defecto = [
     "Administrador", "Recepción", "Diseñador", "Almacén", 
@@ -78,8 +83,56 @@ st.title("🧵 Pixel Thread - Gestión")
 
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "⚙️ Configuración / Usuarios"])
 
-with tabs[2]: # Pestaña de Configuración
-    # Validamos estrictamente si el rol actual es Administrador
+# ------------------------------------------
+# TAB 0: VER ÓRDENES
+# ------------------------------------------
+with tabs[0]:
+    st.subheader("📋 Listado de Órdenes")
+    try:
+        ordenes = supabase.table("ordenes").select("*").execute().data
+        if ordenes:
+            for o in ordenes:
+                with st.expander(f"Orden #{o.get('id', 'N/A')} - Cliente: {o.get('cliente', 'General')}"):
+                    st.write(f"**Detalles:** {o.get('detalles', 'Sin detalles')}")
+                    st.write(f"**Estado:** {o.get('estado', 'Pendiente')}")
+                    if o.get('imagen_url'):
+                        st.image(o.get('imagen_url'), width=250)
+        else:
+            st.info("No hay órdenes registradas.")
+    except Exception as e:
+        st.error(f"Error al cargar las órdenes: {e}")
+
+# ------------------------------------------
+# TAB 1: NUEVA ORDEN
+# ------------------------------------------
+with tabs[1]:
+    st.subheader("➕ Crear Nueva Orden")
+    with st.form("form_nueva_orden", clear_on_submit=True):
+        cliente = st.text_input("Nombre del Cliente")
+        detalles = st.text_area("Detalles del Diseño / Bordado")
+        archivo = st.file_uploader("Subir Imagen o Referencia", type=["png", "jpg", "jpeg"])
+        
+        if st.form_submit_button("Guardar Orden"):
+            try:
+                imagen_url = ""
+                if archivo is not None:
+                    imagen_url = subir_a_supabase(archivo.getvalue(), archivo.name)
+                
+                supabase.table("ordenes").insert({
+                    "cliente": cliente,
+                    "detalles": detalles,
+                    "imagen_url": imagen_url,
+                    "estado": "Pendiente",
+                    "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }).execute()
+                st.success("✅ Orden creada con éxito.")
+            except Exception as e:
+                st.error(f"Error al guardar la orden: {e}")
+
+# ------------------------------------------
+# TAB 2: CONFIGURACIÓN / USUARIOS (SOLO ADMIN)
+# ------------------------------------------
+with tabs[2]:
     if str(st.session_state.get("rol")).strip().lower() != "administrador":
         st.error("⛔ Acceso denegado. Esta sección es exclusiva para el Panel de Administración.")
     else:

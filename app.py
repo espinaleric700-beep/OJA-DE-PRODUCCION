@@ -11,7 +11,7 @@ st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 # Actualización automática cada 10 segundos (10,000 milisegundos)
 st_autorefresh(interval=10000, key="auto_refresh_ordenes")
 
-# CSS personalizado para diseño profesional de fondo oscuro, tipografía nítida y estados a color
+# CSS personalizado para diseño profesional de fondo oscuro y alineación compacta
 st.markdown("""
     <style>
     /* Fondo principal y textos */
@@ -42,7 +42,7 @@ st.markdown("""
         color: #e5e7eb;
     }
     
-    /* Botones principales llamativos y compactos para el selector rápido */
+    /* Botones principales llamativos y compactos */
     .stButton > button {
         background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
         color: white;
@@ -54,6 +54,7 @@ st.markdown("""
         transition: all 0.3s ease;
         width: 100%;
         min-height: 2.2rem;
+        margin-top: 1.6rem;
     }
     .stButton > button:hover {
         background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
@@ -163,16 +164,20 @@ with tabs[0]:
 
                 with col_der:
                     with st.form(f"form_quick_{o.get('id')}"):
-                        nuevo_estado = st.selectbox(
-                            "Cambiar", 
-                            lista_estados, 
-                            index=lista_estados.index(estado_actual) if estado_actual in lista_estados else 0, 
-                            key=f"sel_{o.get('id')}",
-                            label_visibility="collapsed"
-                        )
+                        # Distribución en columnas internas: Selector de estado a la izquierda y Botón actualizar a la derecha
+                        col_sel, col_btn = st.columns([2, 1])
+                        with col_sel:
+                            nuevo_estado = st.selectbox(
+                                "Cambiar", 
+                                lista_estados, 
+                                index=lista_estados.index(estado_actual) if estado_actual in lista_estados else 0, 
+                                key=f"sel_{o.get('id')}",
+                                label_visibility="collapsed"
+                            )
+                        with col_btn:
+                            actualizar_submit = st.form_submit_button("Actualizar")
                         
-                        # Botón optimizado, estilizado y compacto sin icono innecesario
-                        if st.form_submit_button("Actualizar"):
+                        if actualizar_submit:
                             fecha_hora_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                             usuario_actual = st.session_state['usuario']
                             

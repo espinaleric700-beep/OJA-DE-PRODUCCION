@@ -171,27 +171,41 @@ with tab1:
           ):
             nuevo_estado = "En Producción"
 
-        elif estado == "En Producción" and (
-            (
-                o["area_produccion"] == "Bordados"
-                and rol_seleccionado
-                in ["Administrador", "Producción - Bordados"]
-            )
-            or (
-                o["area_produccion"] == "Impresion"
-                and rol_seleccionado
-                in ["Administrador", "Producción - Impresión"]
-            )
-        ):
-          if st.button("🟢 Marcar como Completado", key=f"btn_{o['id']}"
+        elif estado == "En Producción":
+          if (
+              o["area_produccion"] == "Bordados"
+              and rol_seleccionado
+              in ["Administrador", "Producción - Bordados"]
           ):
-            nuevo_estado = "Completado"
+            if st.button(
+                "🟢 Marcar como Completado", key=f"btn_bordado_{o['id']}"
+            ):
+              nuevo_estado = "Completado"
+          elif (
+              o["area_produccion"] == "Impresion"
+              and rol_seleccionado
+              in ["Administrador", "Producción - Impresión"]
+          ):
+            if st.button(
+                "🟢 Avanzar: Enviado a transferencia térmica",
+                key=f"btn_imp_{o['id']}",
+            ):
+              nuevo_estado = "Enviado a transferencia térmica"
 
         elif (
-            estado == "Completado"
-            and rol_seleccionado in ["Administrador", "Recepción"]
+            estado == "Enviado a transferencia térmica"
+            and rol_seleccionado in ["Administrador", "Producción - Impresión"]
         ):
-          if st.button("🟢 Marcar como Entregado (Fin)", key=f"btn_{o['id']}"
+          if st.button(
+              "🟢 Avanzar: Enviado a Recepción", key=f"btn_term_{o['id']}"
+          ):
+            nuevo_estado = "Enviado a Recepción (Transferencia)"
+
+        elif estado in ["Completado", "Enviado a Recepción (Transferencia)"] and rol_seleccionado in [
+            "Administrador",
+            "Recepción",
+        ]:
+          if st.button("🟢 Marcar como Entregado (Fin)", key=f"btn_fin_{o['id']}"
           ):
             nuevo_estado = "Entregado"
 
@@ -251,7 +265,6 @@ with tab2:
 
     if submit:
       if nombre_cliente and nombre_orden:
-        # Subir archivos pesados a Firebase Storage
         url_diseno = ""
         url_recibo = ""
 
@@ -264,10 +277,8 @@ with tab2:
               recibo_subido.getvalue(), recibo_subido.name, "recibos/"
           )
 
-        # Generar número de orden automático
         num_orden = f"ORD-{datetime.now().strftime('%Y')}-{int(datetime.now().timestamp()) % 10000}"
 
-        # Insertar en Supabase
         nueva_fila = {
             "numero_orden": num_orden,
             "nombre_cliente": nombre_cliente,
@@ -293,41 +304,95 @@ with tab3:
 
   if rol_seleccionado != "Administrador":
     st.warning(
-        "Solo el Administrador puede registrar nuevos usuarios y asignar"
-        " roles."
+        "Solo el Administrador puede gestionar usuarios y roles."
     )
   else:
-    with st.form("form_nuevo_usuario"):
-      nuevo_nombre = st.text_input("Nombre Completo del Empleado")
-      nuevo_usuario = st.text_input("Nombre de Usuario (Login)")
-      nuevo_password = st.text_input(
-          "Contraseña", type="password"
+    # Sección para registrar nuevo usuario
+    with st.expander("➕ Registrar Nuevo Usuario"):
+      with st.form("form_nuevo_usuario"):
+        nuevo_nombre = st.text_input("Nombre Completo del Empleado")
+        nuevo_usuario = st.text_input("Nombre de Usuario (Login)")
+        nuevo_password = st.text_input("Contraseña", type="password")
+        nuevo_rol = st.selectbox("Asignar Rol", roles_disponibles)
+
+        submit_usuario = st.form_submit_button("Registrar Usuario")
+
+        if submit_usuario:
+          if nuevo_nombre and nuevo_usuario and nuevo_password:
+            try:
+              supabase.table("usuarios").insert({
+                  "nombre": nuevo_nombre,
+                  "usuario": nuevo_usuario,
+                  "password": nuevo_password,
+                  "rol_id": roles_disponibles.index(nuevo_rol) + 1,
+              }).execute()
+              st.success(
+                  f"¡Usuario '{nuevo_usuario}' registrado con rol '{nuevo_rol}'"
+                  " con éxito!"
+              )
+              st.rerun()
+            except Exception as e:
+              st.error(f"Error al registrar usuario: {e}")
+          else:
+            st.error("Por favor completa todos los campos.")
+
+    st.divider()
+    st.subheader("✏️ Modificar o Eliminar Usuarios Existentes")
+
+    usuarios_res = supabase.table("usuarios").select("*").execute()
+    lista_usuarios = usuarios_res.data
+
+    if lista_usuarios:
+      for u in lista_usuarios:
+        with st.expander(
+            f"Usuario: {u['usuario']} - Nombre: {u['nombre']}"
+        ):
+          with st.form(f"form_mod_{u['id']}"):
+            mod_nombre = st.text_input(
+                "Nombre Completo", value=u["nombre"], key=f"nombre_{u['id']}"
+            )
+            mod_password = st.text_input(
+                "Nueva Contraseña",
+                value=u["password"],
+                type="password",
+                key=f"pass_{u['id']}",
+            )
+            current_rol_index = (
+                u["rol_id"] - 1
+                if 0 <= u["rol_id"] - 1 < len(roles_disponibles)
+                else 0
+            )
+            mod_rol = st.selectbox(
+                "Rol",
+                roles_disponibles,
+                index=current_rol_index,
+                key=f"rol_{u['id']}",
+            )
+
+            col_btn1, col_btn2 = st.columns(2)
+            actualizar = col_btn1.form_submit_button("Actualizar Usuario")
+            eliminar = col_btn2.form_submit_button("Eliminar Usuario")
+
+            if actualizar:
+              supabase.table("usuarios").update({
+                  "nombre": mod_nombre,
+                  "password": mod_password,
+                  "rol_id": roles_disponibles.index(mod_rol) + 1,
+              }).eq("id", u["id"]).execute()
+              st.success("¡Usuario actualizado con éxito!")
+              st.rerun()
+
+            if eliminar:
+              supabase.table("usuarios").delete().eq(
+                  "id", u["id"]
+              ).execute()
+              st.success("¡Usuario eliminado con éxito!")
+              st.rerun()
+    else:
+      st.info(
+          "No hay usuarios registrados en la base de datos o la tabla está"
+          " vacía."
       )
-      nuevo_rol = st.selectbox("Asignar Rol", roles_disponibles)
-
-      submit_usuario = st.form_submit_button("Registrar Usuario")
-
-      if submit_usuario:
-        if nuevo_nombre and nuevo_usuario and nuevo_password:
-          try:
-            # Insertar usuario en la tabla usuarios de Supabase
-            supabase.table("usuarios").insert({
-                "nombre": nuevo_nombre,
-                "usuario": nuevo_usuario,
-                "password": nuevo_password,
-                "rol_id": roles_disponibles.index(nuevo_rol)
-                + 1,  # Asumiendo relación por índice o ID
-            }).execute()
-            st.success(
-                f"¡Usuario '{nuevo_usuario}' registrado con rol '{nuevo_rol}'"
-                " con éxito!"
-            )
-          except Exception as e:
-            st.error(
-                f"Error al registrar usuario (puede que ya exista): {e}"
-            )
-        else:
-          st.error("Por favor completa todos los campos del usuario.")
 
   st.divider()
   st.subheader("📋 Auditoría e Historial de Cambios")

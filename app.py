@@ -10,6 +10,7 @@ import re
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
+# Refresca la app automáticamente cada 15 segundos para ver cambios de otros usuarios
 st_autorefresh(interval=15000, key="auto_refresh_ordenes")
 
 st.markdown("""
@@ -106,7 +107,6 @@ st.sidebar.button("🚪 Cerrar Sesión", on_click=lambda: st.session_state.updat
 st.title("🧵 Pixel Thread - Gestión")
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "📦 Almacén", "⚙️ Usuarios"])
 
-# --- Tabs ---
 with tabs[0]:
     st.subheader("📋 Listado de Órdenes")
     col_f1, col_f2 = st.columns(2)
@@ -279,8 +279,13 @@ with tabs[2]:
                         st.error(f"Error al guardar producto: {e}")
         st.divider()
 
+    # --- FORZAR LECTURA DE DATOS FRESCOS ---
     try:
-        inventario_db = supabase.table("almacen").select("*").execute().data
+        # Esto limpia cualquier caché previa para asegurar que siempre traiga datos de Supabase
+        st.cache_data.clear()
+        response = supabase.table("almacen").select("*").execute()
+        inventario_db = response.data
+        
         if inventario_db:
             st.markdown("### 📋 Existencias Actuales en Almacén")
             for item in inventario_db:
@@ -357,11 +362,12 @@ with tabs[2]:
                                         with sub1:
                                             st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #4ade80;'>{talla}</span></div>", unsafe_allow_html=True)
                                         with sub2:
+                                            # Al cambiar el input, guardamos y recargamos instantáneamente
                                             nueva_cant = st.number_input(f"Talla {talla}", min_value=0, step=1, value=cantidad, key=f"num_{item_id}_{color_sel}_{talla}", label_visibility="collapsed")
                                             if nueva_cant != cantidad:
                                                 dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
                                                 supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                                                st.rerun()
+                                                st.rerun() # Esto recarga toda la página y obliga a traer los datos nuevos
                                     else:
                                         st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='color: #4ade80;'>{talla}</span>: <b>{cantidad:02d}</b></div>", unsafe_allow_html=True)
                                     st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)

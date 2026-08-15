@@ -50,6 +50,8 @@ lista_estados = [
     "Orden Entregada"
 ]
 
+tallas_disponibles = ["4", "6", "8", "10", "12", "14", "16", "S", "M", "L", "XL", "2XL", "3XL", "Única"]
+
 def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     path = f"almacen/{datetime.now().strftime('%Y%m%d%H%M%S')}_{file_name}"
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
@@ -60,6 +62,10 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
 # ==========================================
 if "autenticado" not in st.session_state:
     st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
+
+# Inicializar lista temporal de tallas para el formulario de nuevo producto
+if "tallas_temp" not in st.session_state:
+    st.session_state["tallas_temp"] = {}
 
 st.sidebar.title("🔐 Control de Acceso")
 if not st.session_state["autenticado"]:
@@ -168,24 +174,60 @@ with tabs[2]:
     puede_modificar = st.session_state['rol'] in ["Administrador", "Recepción", "Almacén"]
 
     if puede_modificar:
-        with st.expander("➕ Agregar Nuevo Producto al Inventario"):
-            with st.form("form_nuevo_inventario", clear_on_submit=True):
-                inv_nombre = st.text_input("Nombre de la Prenda (Ej. Camiseta Ojo de Ángel)")
-                inv_tallas = st.text_area("Tallas y Cantidades (Ej. S: 10, M: 25, L: 15, XL: 5)")
-                foto_prenda = st.file_uploader("Foto de la Prenda", type=["png", "jpg", "jpeg"])
-                
-                if st.form_submit_button("Guardar en Inventario"):
+        with st.expander("➕ Agregar Nuevo Producto al Inventario", expanded=True):
+            inv_nombre = st.text_input("Nombre de la Prenda (Ej. Camiseta Ojo de Ángel)", key="input_nombre_prenda")
+            foto_prenda = st.file_uploader("Foto de la Prenda", type=["png", "jpg", "jpeg"], key="input_foto_prenda")
+            
+            st.markdown("---")
+            st.markdown("#### 📏 Selección de Tallas y Cantidades")
+            
+            col_talla, col_cant, col_btn = st.columns([2, 2, 1])
+            with col_talla:
+                talla_seleccionada = st.selectbox("Seleccionar Talla", tallas_disponibles, key="select_talla_temp")
+            with col_cant:
+                cantidad_seleccionada = st.number_input("Cantidad", min_value=0, step=1, key="num_cant_temp")
+            with col_btn:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("➕ Agregar Talla"):
+                    st.session_state["tallas_temp"][talla_seleccionada] = int(cantidad_seleccionada)
+                    st.rerun()
+
+            # Mostrar las tallas que se van agregando dinámicamente
+            if st.session_state["tallas_temp"]:
+                st.markdown("**Tallas agregadas para este producto:**")
+                for t, c in list(st.session_state["tallas_temp"].items()):
+                    c1, c2 = st.columns([4, 1])
+                    c1.markdown(f"- **Talla {t}:** `{c} unidades`")
+                    if c2.button("❌", key=f"del_t_{t}"):
+                        del st.session_state["tallas_temp"][t]
+                        st.rerun()
+            else:
+                st.info("Aún no has agregado ninguna talla. Selecciona una talla y cantidad arriba y presiona 'Agregar Talla'.")
+
+            st.markdown("---")
+            if st.button("💾 Guardar Inventario Completo"):
+                if not inv_nombre.strip():
+                    st.error("⚠️ Debes ingresar el nombre del producto.")
+                elif not st.session_state["tallas_temp"]:
+                    st.error("⚠️ Debes agregar al menos una talla con su cantidad.")
+                else:
                     try:
+                        # Convertir el diccionario a string estructurado (Ej: "S: 10, M: 25, L: 15")
+                        tallas_str = ", ".join([f"{t}: {c}" for t, c in st.session_state["tallas_temp"].items()])
+                        
                         foto_url = ""
                         if foto_prenda:
                             foto_url = subir_a_supabase(foto_prenda.getvalue(), foto_prenda.name)
                         
                         supabase.table("almacen").insert({
                             "nombre_producto": inv_nombre,
-                            "tallas_existencias": inv_tallas,
+                            "tallas_existencias": tallas_str,
                             "imagen_url": foto_url
                         }).execute()
-                        st.success("✅ Producto agregado al inventario correctamente.")
+                        
+                        # Limpiar estado temporal
+                        st.session_state["tallas_temp"] = {}
+                        st.success("✅ ¡Producto guardado en el inventario con éxito!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar producto: {e}")
@@ -213,7 +255,6 @@ with tabs[2]:
                             
                     with col_info:
                         st.markdown("#### 📏 Tallas y Existencias:")
-                        # Mostrar cada talla en formato limpio
                         for t_info in p_tallas.split(","):
                             if ":" in t_info:
                                 talla, cantidad = t_info.split(":", 1)
@@ -225,7 +266,7 @@ with tabs[2]:
                             with st.expander("🛠️ Modificar o Eliminar este producto"):
                                 with st.form(f"form_edit_inv_{item_id}"):
                                     edit_nombre = st.text_input("Nombre de la Prenda", value=p_nombre, key=f"inv_n_{item_id}")
-                                    edit_tallas = st.text_area("Tallas y Cantidades", value=p_tallas, key=f"inv_t_{item_id}")
+                                    edit_tallas = st.text_area("Tallas y Cantidades (Formato: S: 10, M: 15)", value=p_tallas, key=f"inv_t_{item_id}")
                                     
                                     col_act, col_del = st.columns(2)
                                     btn_act = col_act.form_submit_button("💾 Guardar Cambios")

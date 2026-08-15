@@ -63,7 +63,6 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
 if "autenticado" not in st.session_state:
     st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 
-# Inicializar lista temporal de tallas para el formulario de nuevo producto
 if "tallas_temp" not in st.session_state:
     st.session_state["tallas_temp"] = {}
 
@@ -192,7 +191,6 @@ with tabs[2]:
                     st.session_state["tallas_temp"][talla_seleccionada] = int(cantidad_seleccionada)
                     st.rerun()
 
-            # Mostrar las tallas que se van agregando dinámicamente
             if st.session_state["tallas_temp"]:
                 st.markdown("**Tallas agregadas para este producto:**")
                 for t, c in list(st.session_state["tallas_temp"].items()):
@@ -212,7 +210,6 @@ with tabs[2]:
                     st.error("⚠️ Debes agregar al menos una talla con su cantidad.")
                 else:
                     try:
-                        # Convertir el diccionario a string estructurado (Ej: "S: 10, M: 25, L: 15")
                         tallas_str = ", ".join([f"{t}: {c}" for t, c in st.session_state["tallas_temp"].items()])
                         
                         foto_url = ""
@@ -225,7 +222,6 @@ with tabs[2]:
                             "imagen_url": foto_url
                         }).execute()
                         
-                        # Limpiar estado temporal
                         st.session_state["tallas_temp"] = {}
                         st.success("✅ ¡Producto guardado en el inventario con éxito!")
                         st.rerun()
@@ -255,12 +251,13 @@ with tabs[2]:
                             
                     with col_info:
                         st.markdown("#### 📏 Tallas y Existencias:")
-                        for t_info in p_tallas.split(","):
-                            if ":" in t_info:
-                                talla, cantidad = t_info.split(":", 1)
-                                st.markdown(f"- **Talla {talla.strip()}:** `{cantidad.strip()} unidades`")
-                            else:
-                                st.markdown(f"- {t_info.strip()}")
+                        if p_tallas:
+                            for t_info in p_tallas.split(","):
+                                if ":" in t_info:
+                                    talla, cantidad = t_info.split(":", 1)
+                                    st.markdown(f"- **Talla {talla.strip()}:** `{cantidad.strip()} unidades`")
+                                else:
+                                    st.markdown(f"- {t_info.strip()}")
                         
                         if puede_modificar:
                             with st.expander("🛠️ Modificar o Eliminar este producto"):

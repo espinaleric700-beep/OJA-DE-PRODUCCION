@@ -3,9 +3,59 @@ import streamlit as st
 from supabase import create_client
 
 # ==========================================
-# CONFIGURACIÓN Y CONEXIÓN
+# CONFIGURACIÓN Y ESTILO VISUAL (MODO OSCURO)
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
+
+# CSS personalizado para diseño profesional de fondo oscuro
+st.markdown("""
+    <style>
+    /* Fondo principal y textos */
+    .stApp {
+        background-color: #0e1117;
+        color: #fafafa;
+    }
+    
+    /* Contenedores y expanders */
+    div.streamlit-expanderHeader {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        color: #c9d1d9;
+    }
+    
+    /* Tarjetas y bloques de formularios */
+    div[data-testid="stForm"] {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 10px;
+        padding: 20px;
+    }
+    
+    /* Inputs y selectores */
+    stTextInput, stSelectbox, stMultiSelect {
+        color: #fafafa;
+    }
+    
+    /* Botones principales */
+    .stButton > button {
+        background-color: #238636;
+        color: white;
+        border-radius: 6px;
+        border: none;
+        font-weight: 600;
+    }
+    .stButton > button:hover {
+        background-color: #2ea043;
+    }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #010409;
+        border-right: 1px solid #30363d;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
@@ -91,14 +141,10 @@ with tabs[0]:
                             fecha_hora_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                             usuario_actual = st.session_state['usuario']
                             
-                            # Crear el texto del nuevo movimiento
                             nuevo_registro = f"• Estado: **{nuevo_estado}** | Usuario: `{usuario_actual}` | Fecha: {fecha_hora_str}"
-                            
-                            # Obtener historial anterior si existe y acumularlo
                             historial_previo = o.get('historial') or ""
                             historial_actualizado = f"{nuevo_registro}\n{historial_previo}" if historial_previo else nuevo_registro
                             
-                            # Actualizar en la misma tabla de órdenes (evita errores de tablas secundarias)
                             supabase.table("ordenes").update({
                                 "estado": nuevo_estado, 
                                 "estado_actual": nuevo_estado,
@@ -111,7 +157,6 @@ with tabs[0]:
                     if o.get('factura_url'):
                         st.markdown(f"📄 [Ver Factura]({o.get('factura_url')})")
 
-                    # 3. Desplegable con el historial acumulado
                     with st.expander("🕒 Ver historial de cambios de estado"):
                         historial_texto = o.get('historial')
                         if historial_texto:

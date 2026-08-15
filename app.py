@@ -20,28 +20,6 @@ st.markdown("""
     p, label, span, div { color: #e5e7eb; }
     .stButton > button { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-radius: 6px; border: none; font-weight: 600; padding: 0.2rem 0.4rem; width: 100%; min-height: 1.8rem; margin-top: 0rem; }
     [data-testid="stSidebar"] { background-color: #030712; border-right: 1px solid #1f2937; }
-
-    /* Estilos para transformar st.pills en círculos de colores */
-    [data-testid="stPills"] {
-        display: flex;
-        gap: 12px;
-    }
-    [data-testid="stPills"] button {
-        width: 40px !important;
-        height: 40px !important;
-        border-radius: 50% !important;
-        padding: 0 !important;
-        border: 2px solid #374151 !important;
-        color: transparent !important; /* Oculta el texto para mostrar solo el círculo de color */
-        font-size: 0px !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        transition: transform 0.2s ease, border-color 0.2s ease;
-    }
-    [data-testid="stPills"] button[aria-selected="true"] {
-        border-color: #60a5fa !important;
-        transform: scale(1.15);
-        box-shadow: 0 0 10px rgba(96, 165, 250, 0.6);
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -290,36 +268,34 @@ with tabs[2]:
                     if es_avanzado and dict_colores:
                         lista_cols = list(dict_colores.keys())
                         
-                        key_pills = f"pills_color_{item_id}"
-                        if key_pills not in st.session_state or st.session_state[key_pills] not in lista_cols:
-                            st.session_state[key_pills] = lista_cols[0]
+                        key_activo = f"color_activo_btn_{item_id}"
+                        if key_activo not in st.session_state or st.session_state[key_activo] not in lista_cols:
+                            st.session_state[key_activo] = lista_cols[0]
 
                         st.markdown("Colores")
 
-                        # Generar estilos dinámicos para pintar cada píldora circular con su respectivo código HEX guardado
-                        css_pills_custom = ""
-                        for idx_c, c_name in enumerate(lista_cols):
+                        # Creamos una botonera horizontal con círculos de color y el nombre
+                        cols_botones = st.columns(len(lista_cols))
+                        for i, c_name in enumerate(lista_cols):
                             c_hex = dict_colores[c_name].get("hex", "#3b82f6")
-                            css_pills_custom += f"""
-                            div[data-testid="stPills"] button:nth-child({idx_c + 1}) {{
-                                background-color: {c_hex} !important;
-                            }}
-                            """
-                        st.markdown(f"<style>{css_pills_custom}</style>", unsafe_allow_html=True)
-                        
-                        color_seleccionado_ver = st.pills(
-                            "Colores disponibles", 
-                            lista_cols, 
-                            default=st.session_state[key_pills], 
-                            key=f"widget_pills_{item_id}",
-                            label_visibility="collapsed"
-                        )
-                        
-                        if color_seleccionado_ver and color_seleccionado_ver != st.session_state[key_pills]:
-                            st.session_state[key_pills] = color_seleccionado_ver
-                            st.rerun()
+                            es_seleccionado = (st.session_state[key_activo] == c_name)
+                            borde_estilo = "border: 2px solid #60a5fa; box-shadow: 0 0 8px rgba(96, 165, 250, 0.6);" if es_seleccionado else "border: 1px solid #374151;"
+                            
+                            with cols_botones[i]:
+                                if st.button(f"🔴 {c_name}", key=f"btn_col_{item_id}_{c_name}", use_container_width=True):
+                                    st.session_state[key_activo] = c_name
+                                    st.rerun()
+                                
+                                # Inyectamos el círculo de color personalizado justo debajo/encima del botón usando HTML limpio
+                                st.markdown(f"""
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 8px; background: #111827; padding: 6px; border-radius: 6px; {borde_estilo} margin-top: -5px;">
+                                    <div style="width: 16px; height: 16px; background-color: {c_hex}; border-radius: 50%; border: 1px solid #ffffff55;"></div>
+                                    <span style="font-size: 0.85em; font-weight: bold; color: {'#60a5fa' if es_seleccionado else '#e5e7eb'};">{c_name}</span>
+                                </div>
+                                """, unsafe_allow_html=True)
 
-                        color_seleccionado_ver = st.session_state[key_pills]
+                        color_seleccionado_ver = st.session_state[key_activo]
+                        st.markdown("<br>", unsafe_allow_html=True)
                         
                         col_img, col_info = st.columns([1, 3])
                         

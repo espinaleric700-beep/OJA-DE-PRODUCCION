@@ -75,6 +75,7 @@ def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, histori
 # Estado global inicial
 if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 if "colores_inventario_avanzado" not in st.session_state: st.session_state["colores_inventario_avanzado"] = {}
+if "sync_trigger" not in st.session_state: st.session_state["sync_trigger"] = 0
 
 # --- Autenticación y Barra Lateral ---
 if not st.session_state["autenticado"]:
@@ -101,6 +102,8 @@ st.sidebar.success(f"👋 ¡Bienvenido, **{st.session_state['usuario']}**!\n\nRo
 
 st.sidebar.markdown("---")
 if st.sidebar.button("🔄 Sincronizar / Refrescar Datos", use_container_width=True):
+    # Incrementamos el contador para invalidar estados internos y forzar lectura fresca
+    st.session_state["sync_trigger"] += 1
     st.rerun()
 
 st.sidebar.button("🚪 Cerrar Sesión", on_click=lambda: st.session_state.update({"autenticado": False}))
@@ -281,125 +284,131 @@ with tabs[2]:
                         st.error(f"Error al guardar producto: {e}")
         st.divider()
 
-    try:
-        response = supabase.table("almacen").select("*").execute()
-        inventario_db = response.data
-        
-        if inventario_db:
-            st.markdown("### 📋 Existencias Actuales en Almacén")
-            for item in inventario_db:
-                item_id = item.get("id")
-                p_nombre = item.get("nombre_producto", "Sin nombre")
-                p_tallas_str = item.get("tallas_existencias", "{}")
+    # Fragmento aislado que fuerza la recarga limpia de Supabase usando el sync_trigger
+    @st.fragment
+    def render_inventario_fresco(trigger_val):
+        try:
+            response = supabase.table("almacen").select("*").execute()
+            inventario_db = response.data
+            
+            if inventario_db:
+                st.markdown("### 📋 Existencias Actuales en Almacén")
+                for item in inventario_db:
+                    item_id = item.get("id")
+                    p_nombre = item.get("nombre_producto", "Sin nombre")
+                    p_tallas_str = item.get("tallas_existencias", "{}")
 
-                dict_colores = {}
-                try:
-                    if p_tallas_str:
-                        temp_data = json.loads(p_tallas_str)
-                        if isinstance(temp_data, dict):
-                            es_estructura_vieja = any(t in temp_data for t in tallas_disponibles)
-                            if es_estructura_vieja:
-                                dict_colores = {
-                                    "Único": {
-                                        "tallas": {t: int(temp_data.get(t, 0)) for t in tallas_disponibles},
-                                        "imagen_url": item.get("imagen_url", ""),
-                                        "hex": "#3b82f6"
-                                    }
-                                }
-                                supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                            else:
-                                dict_colores = temp_data
-                except Exception:
                     dict_colores = {}
-
-                st.markdown(f"### 🏷️ {p_nombre}")
-                
-                if dict_colores:
-                    lista_cols = list(dict_colores.keys())
-                    key_activo = f"color_activo_prod_{item_id}"
-                    
-                    if key_activo not in st.session_state or st.session_state[key_activo] not in lista_cols:
-                        st.session_state[key_activo] = lista_cols[0]
-                    
-                    st.markdown("Colores")
-                    cols_colores = st.columns(min(len(lista_cols), 4))
-                    for idx, c_name in enumerate(lista_cols):
-                        with cols_colores[idx % len(cols_colores)]:
-                            if st.button(c_name, key=f"btn_color_item_{item_id}_{c_name}", use_container_width=True):
-                                st.session_state[key_activo] = c_name
-                                st.rerun()
-                    
-                    color_sel = st.session_state[key_activo]
-                    data_color = dict_colores.get(color_sel, {})
-                    
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    col_img, col_info = st.columns([1, 2])
-                    
-                    with col_img:
-                        if data_color.get("imagen_url"): 
-                            st.image(data_color["imagen_url"], use_container_width=True)
-                        else:
-                            st.info("Sin imagen para este color")
-                            
-                    with col_info:
-                        st.markdown(f"**Existencias para el color: `{color_sel}`**")
-                        tallas_del_color = data_color.get("tallas", {})
-                        
-                        columna_1 = ["2", "4", "6", "8", "10"]
-                        columna_2 = ["12", "14", "16", "S", "M"]
-                        columna_3 = ["WS", "WM", "L", "XL", "2XL"]
-                        
-                        grid_cols = st.columns(3)
-                        grupos_tallas = [columna_1, columna_2, columna_3]
-                        
-                        for col_idx, grupo in enumerate(grupos_tallas):
-                            with grid_cols[col_idx]:
-                                for talla in grupo:
-                                    cantidad = int(tallas_del_color.get(talla, 0))
-                                    if puede_modificar:
-                                        sub1, sub2, sub3 = st.columns([1.2, 2.0, 0.8])
-                                        with sub1:
-                                            st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #4ade80;'>{talla}</span></div>", unsafe_allow_html=True)
-                                        with sub2:
-                                            nueva_cant = st.number_input(f"Talla {talla}", min_value=0, step=1, value=cantidad, key=f"num_{item_id}_{color_sel}_{talla}", label_visibility="collapsed")
-                                        with sub3:
-                                            if st.button("💾", key=f"save_{item_id}_{color_sel}_{talla}", help=f"Guardar Talla {talla}"):
-                                                if nueva_cant != cantidad:
-                                                    dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
-                                                    supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                                                    st.success("¡Guardado!")
-                                                    st.rerun()
-                                    else:
-                                        st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='color: #4ade80;'>{talla}</span>: <b>{cantidad:02d}</b></div>", unsafe_allow_html=True)
-                                    st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)
-                else:
-                    st.warning("⚠️ Formato de colores estructurado no válido.")
-
-                if puede_modificar:
-                    with st.expander(f"🛠️ Gestionar Colores e Imagen de: {p_nombre}"):
-                        nueva_img_file = st.file_uploader(f"Nueva imagen para `{color_sel}`", type=["png", "jpg", "jpeg"], key=f"up_img_prod_{item_id}_{color_sel}")
-                        if st.button("💾 Guardar Nueva Imagen", key=f"btn_save_img_{item_id}_{color_sel}"):
-                            if nueva_img_file is not None:
-                                try:
-                                    url_subida = subir_a_supabase(nueva_img_file.getvalue(), nueva_img_file.name)
-                                    dict_colores[color_sel]["imagen_url"] = url_subida
+                    try:
+                        if p_tallas_str:
+                            temp_data = json.loads(p_tallas_str)
+                            if isinstance(temp_data, dict):
+                                es_estructura_vieja = any(t in temp_data for t in tallas_disponibles)
+                                if es_estructura_vieja:
+                                    dict_colores = {
+                                        "Único": {
+                                            "tallas": {t: int(temp_data.get(t, 0)) for t in tallas_disponibles},
+                                            "imagen_url": item.get("imagen_url", ""),
+                                            "hex": "#3b82f6"
+                                        }
+                                    }
                                     supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                                    st.success("✅ ¡Imagen actualizada!")
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Error: {e}")
-                            else:
-                                st.warning("Selecciona una imagen primero.")
+                                else:
+                                    dict_colores = temp_data
+                    except Exception:
+                        dict_colores = {}
+
+                    st.markdown(f"### 🏷️ {p_nombre}")
+                    
+                    if dict_colores:
+                        lista_cols = list(dict_colores.keys())
+                        key_activo = f"color_activo_prod_{item_id}_{trigger_val}"
                         
-                        if st.button("🗑️ Eliminar Producto Completo", key=f"del_prod_item_{item_id}"):
-                            supabase.table("almacen").delete().eq("id", item_id).execute()
-                            st.warning("⚠️ Producto eliminado.")
-                            st.rerun()
-                st.divider()
-        else:
-            st.info("No hay productos registrados en el almacén.")
-    except Exception as e:
-        st.error(f"Error al cargar almacén: {e}")
+                        if key_activo not in st.session_state or st.session_state[key_activo] not in lista_cols:
+                            st.session_state[key_activo] = lista_cols[0]
+                        
+                        st.markdown("Colores")
+                        cols_colores = st.columns(min(len(lista_cols), 4))
+                        for idx, c_name in enumerate(lista_cols):
+                            with cols_colores[idx % len(cols_colores)]:
+                                if st.button(c_name, key=f"btn_color_item_{item_id}_{c_name}_{trigger_val}", use_container_width=True):
+                                    st.session_state[key_activo] = c_name
+                                    st.rerun()
+                        
+                        color_sel = st.session_state[key_activo]
+                        data_color = dict_colores.get(color_sel, {})
+                        
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        col_img, col_info = st.columns([1, 2])
+                        
+                        with col_img:
+                            if data_color.get("imagen_url"): 
+                                st.image(data_color["imagen_url"], use_container_width=True)
+                            else:
+                                st.info("Sin imagen para este color")
+                                
+                        with col_info:
+                            st.markdown(f"**Existencias para el color: `{color_sel}`**")
+                            tallas_del_color = data_color.get("tallas", {})
+                            
+                            columna_1 = ["2", "4", "6", "8", "10"]
+                            columna_2 = ["12", "14", "16", "S", "M"]
+                            columna_3 = ["WS", "WM", "L", "XL", "2XL"]
+                            
+                            grid_cols = st.columns(3)
+                            grupos_tallas = [columna_1, columna_2, columna_3]
+                            
+                            for col_idx, grupo in enumerate(grupos_tallas):
+                                with grid_cols[col_idx]:
+                                    for talla in grupo:
+                                        cantidad = int(tallas_del_color.get(talla, 0))
+                                        if puede_modificar:
+                                            sub1, sub2, sub3 = st.columns([1.2, 2.0, 0.8])
+                                            with sub1:
+                                                st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #4ade80;'>{talla}</span></div>", unsafe_allow_html=True)
+                                            with sub2:
+                                                # Clave dinámica amarrada al trigger de sincronización para limpiar el input viejo
+                                                nueva_cant = st.number_input(f"Talla {talla}", min_value=0, step=1, value=cantidad, key=f"num_{item_id}_{color_sel}_{talla}_{trigger_val}", label_visibility="collapsed")
+                                            with sub3:
+                                                if st.button("💾", key=f"save_{item_id}_{color_sel}_{talla}_{trigger_val}", help=f"Guardar Talla {talla}"):
+                                                    if nueva_cant != cantidad:
+                                                        dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
+                                                        supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                                        st.success("¡Guardado!")
+                                                        st.rerun()
+                                        else:
+                                            st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='color: #4ade80;'>{talla}</span>: <b>{cantidad:02d}</b></div>", unsafe_allow_html=True)
+                                        st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)
+                    else:
+                        st.warning("⚠️ Formato de colores estructurado no válido.")
+
+                    if puede_modificar:
+                        with st.expander(f"🛠️ Gestionar Colores e Imagen de: {p_nombre}"):
+                            nueva_img_file = st.file_uploader(f"Nueva imagen para `{color_sel}`", type=["png", "jpg", "jpeg"], key=f"up_img_prod_{item_id}_{color_sel}_{trigger_val}")
+                            if st.button("💾 Guardar Nueva Imagen", key=f"btn_save_img_{item_id}_{color_sel}_{trigger_val}"):
+                                if nueva_img_file is not None:
+                                    try:
+                                        url_subida = subir_a_supabase(nueva_img_file.getvalue(), nueva_img_file.name)
+                                        dict_colores[color_sel]["imagen_url"] = url_subida
+                                        supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                        st.success("✅ ¡Imagen actualizada!")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Error: {e}")
+                                else:
+                                    st.warning("Selecciona una imagen primero.")
+                            
+                            if st.button("🗑️ Eliminar Producto Completo", key=f"del_prod_item_{item_id}_{trigger_val}"):
+                                supabase.table("almacen").delete().eq("id", item_id).execute()
+                                st.warning("⚠️ Producto eliminado.")
+                                st.rerun()
+                    st.divider()
+            else:
+                st.info("No hay productos registrados en el almacén.")
+        except Exception as e:
+            st.error(f"Error al cargar almacén: {e}")
+
+    render_inventario_fresco(st.session_state["sync_trigger"])
 
 with tabs[3]:
     if st.session_state['rol'] == "Administrador":

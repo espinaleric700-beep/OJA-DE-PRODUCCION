@@ -17,8 +17,12 @@ st.markdown("""
     div.streamlit-expanderHeader { background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; color: #f9fafb; font-weight: 600; }
     div[data-testid="stForm"] { background-color: #111827; border: 1px solid #374151; border-radius: 10px; padding: 10px; }
     p, label, span, div { color: #e5e7eb; }
-    .stButton > button { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-radius: 6px; border: none; font-weight: 600; padding: 0.2rem 0.5rem; width: 100%; min-height: 1.8rem; margin-top: 0rem; }
+    .stButton > button { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-radius: 6px; border: none; font-weight: 600; padding: 0.2rem 0.4rem; width: 100%; min-height: 1.8rem; margin-top: 0rem; }
     [data-testid="stSidebar"] { background-color: #030712; border-right: 1px solid #1f2937; }
+    /* Reducir espacio entre columnas compactas de tallas para acercar los botones */
+    [data-testid="column"] {
+        padding: 0px 2px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -273,8 +277,7 @@ with tabs[2]:
                                         talla, cantidad = tallas_items[i + j]
                                         with fila_cols[j]:
                                             if puede_modificar:
-                                                # Tarjeta compacta con botones integrados al lado de la cantidad
-                                                sub_c_btn1, sub_c_txt, sub_c_btn2 = st.columns([1, 2, 1])
+                                                sub_c_btn1, sub_c_txt, sub_c_btn2 = st.columns([0.6, 2, 0.6], gap="small")
                                                 with sub_c_btn1:
                                                     if st.button("➖", key=f"m_{item_id}_{talla}"):
                                                         if cantidad > 0:
@@ -283,7 +286,7 @@ with tabs[2]:
                                                             supabase.table("almacen").update({"tallas_existencias": nuevo_str}).eq("id", item_id).execute()
                                                             st.rerun()
                                                 with sub_c_txt:
-                                                    st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold;'>{talla}</span><br><span style='font-size: 0.9em; color: #60a5fa;'>{cantidad}</span></div>", unsafe_allow_html=True)
+                                                    st.markdown(f"<div style='background-color: #111827; padding: 4px 2px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.8em; font-weight: bold;'>{talla}</span><br><span style='font-size: 0.85em; color: #60a5fa;'>{cantidad}</span></div>", unsafe_allow_html=True)
                                                 with sub_c_btn2:
                                                     if st.button("➕", key=f"p_{item_id}_{talla}"):
                                                         dict_tallas[talla] = cantidad + 1

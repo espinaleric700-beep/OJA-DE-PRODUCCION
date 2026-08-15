@@ -16,12 +16,18 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "image/jpeg", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
-# Cargar roles desde la tabla `roles` de Supabase de forma dinámica
+# Cargar roles desde la tabla `roles` de Supabase
 try:
-    res_roles = supabase.table("roles").select("nombre_rol").execute()
-    roles_disponibles = [r["nombre_rol"] for r in res_roles.data] if res_roles.data else ["Administrador", "Recepción"]
+    res_roles = supabase.table("roles").select("*").execute()
+    roles_db = res_roles.data if res_roles.data else []
+    # Diccionario para mapear nombre -> id y viceversa
+    mapa_nombre_a_id = {r["nombre_rol"]: r["id"] for r in roles_db}
+    mapa_id_a_nombre = {r["id"]: r["nombre_rol"] for r in roles_db}
+    roles_disponibles = list(mapa_nombre_a_id.keys()) if roles_db else ["Administrador", "Recepción"]
 except:
     roles_disponibles = ["Administrador", "Recepción", "Diseñador", "Almacén", "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"]
+    mapa_nombre_a_id = {}
+    mapa_id_a_nombre = {}
 
 # ==========================================
 # GESTIÓN DE SESIÓN Y AUTENTICACIÓN
@@ -73,7 +79,11 @@ if not st.session_state["autenticado"]:
                     if usuario_encontrado:
                         st.session_state["autenticado"] = True
                         st.session_state["usuario"] = usuario_input
-                        st.session_state["rol"] = usuario_encontrado.get("rol", rol_input)
+                        
+                        # Resolver rol por rol_id o por texto directo si existiera
+                        r_id = usuario_encontrado.get("rol_id")
+                        rol_nombre = mapa_id_a_nombre.get(r_id, usuario_encontrado.get("rol", rol_input))
+                        st.session_state["rol"] = rol_nombre
                         st.rerun()
                     else:
                         st.sidebar.error("❌ Usuario o contraseña incorrectos.")
@@ -253,25 +263,19 @@ def cargar_panel_principal():
                         st.warning("Completa todos los campos.")
                     else:
                         try:
+                            # Obtener el ID del rol seleccionado en base a la tabla roles
+                            id_rol_asignado = mapa_nombre_a_id.get(n_rol)
+                            
                             supabase.table("usuarios").insert({
                                 "nombre": n_nombre,
                                 "usuario": n_user,
                                 "password": n_pass,
-                                "rol": n_rol
+                                "rol_id": id_rol_asignado
                             }).execute()
                             st.success("Usuario creado con éxito.")
                             st.rerun()
                         except Exception as e:
-                            try:
-                                supabase.table("usuarios").insert({
-                                    "nombre": n_nombre,
-                                    "usuario": n_user,
-                                    "password": n_pass
-                                }).execute()
-                                st.warning("⚠️ Usuario guardado, pero falta la columna 'rol' en la tabla 'usuarios' de Supabase.")
-                                st.rerun()
-                            except Exception as err:
-                                st.error(f"Error al registrar: {err}")
+                            st.error(f"Error al registrar usuario: {e}")
 
             st.markdown("---")
             
@@ -281,12 +285,13 @@ def cargar_panel_principal():
                 
                 if usuarios_lista:
                     for u in usuarios_lista:
-                        rol_actual_db = u.get('rol', roles_disponibles[0])
+                        r_id = u.get('rol_id')
+                        rol_actual_db = mapa_id_a_nombre.get(r_id, roles_disponibles[0])
                         if rol_actual_db not in roles_disponibles:
                             rol_actual_db = roles_disponibles[0]
                         idx_rol = roles_disponibles.index(rol_actual_db)
 
-                        with st.expander(f"👤 {u.get('nombre', 'Sin nombre')} ({u.get('usuario', '')}) - Rol: {u.get('rol', 'No especificado')}"):
+                        with st.expander(f"👤 {u.get('nombre', 'Sin nombre')} ({u.get('usuario', '')}) - Rol: {rol_actual_db}"):
                             col1, col2 = st.columns(2)
                             
                             with col1:
@@ -297,25 +302,17 @@ def cargar_panel_principal():
                                 
                                 if st.button("💾 Actualizar Usuario", key=f"btn_upd_{u['id']}"):
                                     try:
+                                        nuevo_id_rol = mapa_nombre_a_id.get(nuevo_rol)
                                         supabase.table("usuarios").update({
                                             "nombre": nuevo_nombre,
                                             "usuario": nuevo_user,
                                             "password": nuevo_pass,
-                                            "rol": nuevo_rol
+                                            "rol_id": nuevo_id_rol
                                         }).eq("id", u["id"]).execute()
                                         st.success("¡Actualizado correctamente!")
                                         st.rerun()
                                     except Exception as e:
-                                        try:
-                                            supabase.table("usuarios").update({
-                                                "nombre": nuevo_nombre,
-                                                "usuario": nuevo_user,
-                                                "password": nuevo_pass
-                                            }).eq("id", u["id"]).execute()
-                                            st.warning("⚠️ Actualizado, pero falta la columna 'rol' en la tabla 'usuarios'.")
-                                            st.rerun()
-                                        except Exception as err:
-                                            st.error(f"Error al actualizar: {err}")
+                                        st.error(f"Error al actualizar usuario: {e}")
                             
                             with col2:
                                 st.write("###") 

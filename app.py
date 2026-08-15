@@ -171,8 +171,7 @@ with tabs[2]:
         with st.expander("➕ Agregar Nuevo Producto al Inventario"):
             with st.form("form_nuevo_inventario", clear_on_submit=True):
                 inv_nombre = st.text_input("Nombre de la Prenda (Ej. Camiseta Ojo de Ángel)")
-                inv_size = st.text_input("Talla / Size (Ej. S, M, L, XL, 2XL)")
-                inv_cantidad = st.number_input("Cantidad en Existencia", min_value=0, step=1)
+                inv_tallas = st.text_area("Tallas y Cantidades (Ej. S: 10, M: 25, L: 15, XL: 5)")
                 foto_prenda = st.file_uploader("Foto de la Prenda", type=["png", "jpg", "jpeg"])
                 
                 if st.form_submit_button("Guardar en Inventario"):
@@ -183,8 +182,7 @@ with tabs[2]:
                         
                         supabase.table("almacen").insert({
                             "nombre_producto": inv_nombre,
-                            "talla": inv_size,
-                            "cantidad": int(inv_cantidad),
+                            "tallas_existencias": inv_tallas,
                             "imagen_url": foto_url
                         }).execute()
                         st.success("✅ Producto agregado al inventario correctamente.")
@@ -200,8 +198,7 @@ with tabs[2]:
             for item in inventario_db:
                 item_id = item.get("id")
                 p_nombre = item.get("nombre_producto", "Sin nombre")
-                p_talla = item.get("talla", "N/A")
-                p_cantidad = item.get("cantidad", 0)
+                p_tallas = item.get("tallas_existencias", "No especificado")
                 p_imagen = item.get("imagen_url", "")
 
                 with st.container():
@@ -215,15 +212,20 @@ with tabs[2]:
                             st.info("Sin foto disponible")
                             
                     with col_info:
-                        st.markdown(f"**Talla / Size:** `{p_talla}`")
-                        st.markdown(f"**Cantidad en Existencia:** **{p_cantidad} unidades**")
+                        st.markdown("#### 📏 Tallas y Existencias:")
+                        # Mostrar cada talla en formato limpio
+                        for t_info in p_tallas.split(","):
+                            if ":" in t_info:
+                                talla, cantidad = t_info.split(":", 1)
+                                st.markdown(f"- **Talla {talla.strip()}:** `{cantidad.strip()} unidades`")
+                            else:
+                                st.markdown(f"- {t_info.strip()}")
                         
                         if puede_modificar:
                             with st.expander("🛠️ Modificar o Eliminar este producto"):
                                 with st.form(f"form_edit_inv_{item_id}"):
                                     edit_nombre = st.text_input("Nombre de la Prenda", value=p_nombre, key=f"inv_n_{item_id}")
-                                    edit_talla = st.text_input("Talla / Size", value=p_talla, key=f"inv_t_{item_id}")
-                                    edit_cant = st.number_input("Cantidad", value=int(p_cantidad), min_value=0, step=1, key=f"inv_c_{item_id}")
+                                    edit_tallas = st.text_area("Tallas y Cantidades", value=p_tallas, key=f"inv_t_{item_id}")
                                     
                                     col_act, col_del = st.columns(2)
                                     btn_act = col_act.form_submit_button("💾 Guardar Cambios")
@@ -233,8 +235,7 @@ with tabs[2]:
                                         try:
                                             supabase.table("almacen").update({
                                                 "nombre_producto": edit_nombre,
-                                                "talla": edit_talla,
-                                                "cantidad": int(edit_cant)
+                                                "tallas_existencias": edit_tallas
                                             }).eq("id", item_id).execute()
                                             st.success("✅ Inventario actualizado.")
                                             st.rerun()

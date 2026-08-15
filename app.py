@@ -274,25 +274,31 @@ with tabs[2]:
 
                         st.markdown("Colores")
 
-                        # Creamos una botonera horizontal con círculos de color y el nombre
-                        cols_botones = st.columns(len(lista_cols))
-                        for i, c_name in enumerate(lista_cols):
+                        # Inyectamos estilos dinámicos directamente para colorear el fondo del botón de Streamlit con el tono HEX correspondiente
+                        css_botones_dinamicos = ""
+                        for idx_c, c_name in enumerate(lista_cols):
                             c_hex = dict_colores[c_name].get("hex", "#3b82f6")
                             es_seleccionado = (st.session_state[key_activo] == c_name)
-                            borde_estilo = "border: 2px solid #60a5fa; box-shadow: 0 0 8px rgba(96, 165, 250, 0.6);" if es_seleccionado else "border: 1px solid #374151;"
+                            borde_color = "3px solid #ffffff" if es_seleccionado else "2px solid #374151"
                             
+                            css_botones_dinamicos += f"""
+                            div[data-testid="column"]:has(button#btn_col_{item_id}_{c_name}) button {{
+                                background-color: {c_hex} !important;
+                                color: #ffffff !important;
+                                border: {borde_color} !important;
+                                font-weight: bold !important;
+                                text-shadow: 0px 1px 2px rgba(0,0,0,0.8);
+                            }}
+                            """
+                        st.markdown(f"<style>{css_botones_dinamicos}</style>", unsafe_allow_html=True)
+
+                        # Creamos los botones donde el mismo botón muestra el nombre y el color de fondo exacto
+                        cols_botones = st.columns(len(lista_cols))
+                        for i, c_name in enumerate(lista_cols):
                             with cols_botones[i]:
-                                if st.button(f"🔴 {c_name}", key=f"btn_col_{item_id}_{c_name}", use_container_width=True):
+                                if st.button(c_name, key=f"btn_col_{item_id}_{c_name}", use_container_width=True):
                                     st.session_state[key_activo] = c_name
                                     st.rerun()
-                                
-                                # Inyectamos el círculo de color personalizado justo debajo/encima del botón usando HTML limpio
-                                st.markdown(f"""
-                                <div style="display: flex; align-items: center; justify-content: center; gap: 8px; background: #111827; padding: 6px; border-radius: 6px; {borde_estilo} margin-top: -5px;">
-                                    <div style="width: 16px; height: 16px; background-color: {c_hex}; border-radius: 50%; border: 1px solid #ffffff55;"></div>
-                                    <span style="font-size: 0.85em; font-weight: bold; color: {'#60a5fa' if es_seleccionado else '#e5e7eb'};">{c_name}</span>
-                                </div>
-                                """, unsafe_allow_html=True)
 
                         color_seleccionado_ver = st.session_state[key_activo]
                         st.markdown("<br>", unsafe_allow_html=True)

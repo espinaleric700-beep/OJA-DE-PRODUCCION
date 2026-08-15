@@ -201,30 +201,67 @@ def cargar_panel_principal():
             st.error("⚠️ No tienes permisos para crear o modificar órdenes.")
 
     if rol_seleccionado == "Administrador":
-        tab3_roles_disponibles = ["Administrador", "Recepción", "Diseñador", "Almacén", "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"]
         with tab3:
             st.subheader("👥 Gestión de Usuarios")
-            n_nombre = st.text_input("Nombre Completo (Obligatorio en BD)")
-            n_user = st.text_input("Nombre de Usuario")
-            n_pass = st.text_input("Contraseña", type="password")
-            n_rol = st.selectbox("Rol", tab3_roles_disponibles, key="sel_rol_n")
             
-            if st.button("Registrar Usuario"):
-                if not n_nombre or not n_user or not n_pass:
-                    st.warning("Por favor completa todos los campos.")
+            # --- FORMULARIO DE REGISTRO ---
+            with st.expander("➕ Registrar Nuevo Usuario"):
+                n_nombre = st.text_input("Nombre Completo")
+                n_user = st.text_input("Nombre de Usuario")
+                n_pass = st.text_input("Contraseña", type="password")
+                
+                if st.button("Guardar Usuario"):
+                    if not n_nombre or not n_user or not n_pass:
+                        st.warning("Completa todos los campos.")
+                    else:
+                        try:
+                            supabase.table("usuarios").insert({
+                                "nombre": n_nombre,
+                                "usuario": n_user,
+                                "password": n_pass
+                            }).execute()
+                            st.success("Usuario creado con éxito.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al registrar: {e}")
+
+            st.markdown("---")
+            
+            # --- LISTADO Y EDICIÓN/ELIMINACIÓN DE USUARIOS ---
+            st.subheader("🛠️ Usuarios Existentes")
+            try:
+                usuarios_lista = supabase.table("usuarios").select("*").execute().data
+                
+                if usuarios_lista:
+                    for u in usuarios_lista:
+                        with st.expander(f"👤 {u.get('nombre', 'Sin nombre')} ({u.get('usuario', '')})"):
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                nuevo_nombre = st.text_input("Nombre", value=u.get('nombre', ''), key=f"edit_n_{u['id']}")
+                                nuevo_user = st.text_input("Usuario", value=u.get('usuario', ''), key=f"edit_u_{u['id']}")
+                                nuevo_pass = st.text_input("Contraseña", value=u.get('password', ''), type="password", key=f"edit_p_{u['id']}")
+                                
+                                if st.button("💾 Actualizar Usuario", key=f"btn_upd_{u['id']}"):
+                                    supabase.table("usuarios").update({
+                                        "nombre": nuevo_nombre,
+                                        "usuario": nuevo_user,
+                                        "password": nuevo_pass
+                                    }).eq("id", u["id"]).execute()
+                                    st.success("¡Actualizado correctamente!")
+                                    st.rerun()
+                            
+                            with col2:
+                                st.write("###") 
+                                if st.button("🗑️ Eliminar Usuario", key=f"btn_del_{u['id']}"):
+                                    supabase.table("usuarios").delete().eq("id", u["id"]).execute()
+                                    st.success("¡Eliminado correctamente!")
+                                    st.rerun()
                 else:
-                    try:
-                        # Se omite 'rol' porque la tabla usuarios no tiene esa columna
-                        supabase.table("usuarios").insert({
-                            "nombre": n_nombre,
-                            "usuario": n_user,
-                            "password": n_pass
-                        }).execute()
-                        st.success("¡Usuario registrado con éxito en la base de datos!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"No se pudo registrar automáticamente: {e}")
-            
+                    st.info("No hay usuarios registrados en la base de datos.")
+            except Exception as e:
+                st.error(f"Error al cargar la lista de usuarios: {e}")
+
             st.markdown("---")
             st.subheader("📊 Historial de Movimientos y Cancelaciones")
             try:

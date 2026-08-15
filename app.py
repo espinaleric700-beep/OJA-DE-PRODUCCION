@@ -18,7 +18,7 @@ st.markdown("""
     div.streamlit-expanderHeader { background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; color: #f9fafb; font-weight: 600; }
     div[data-testid="stForm"] { background-color: #111827; border: 1px solid #374151; border-radius: 10px; padding: 10px; }
     p, label, span, div { color: #e5e7eb; }
-    .stButton > button { border-radius: 4px; border: none; font-weight: 600; padding: 0.1rem 0.3rem; min-height: 1.5rem; font-size: 0.8rem; }
+    .stButton > button { border-radius: 4px; border: none; font-weight: 600; padding: 0.3rem 0.6rem; min-height: 2rem; font-size: 0.85rem; }
     [data-testid="stSidebar"] { background-color: #030712; border-right: 1px solid #1f2937; }
     </style>
 """, unsafe_allow_html=True)
@@ -144,72 +144,54 @@ with tabs[0]:
                 estado_actual = o.get('estado', 'Pendiente')
                 historial_db = o.get('historial', "[]")
                 
-                # Dividimos en 2 columnas: una para el selector rápido con botón y otra para el expander completo
-                col_select, col_exp = st.columns([2.2, 3.8])
-                
-                with col_select:
-                    sub_col_sel, sub_col_btn = st.columns([3, 1])
-                    with sub_col_sel:
+                with st.expander(f"Orden #{numero_o} - {cliente_o} [Estado: {estado_actual}]"):
+                    if st.session_state['rol'] in ["Administrador", "Recepción"]:
+                        col_info1, col_info2 = st.columns(2)
+                        with col_info1:
+                            st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
+                            st.write(f"**Fecha de Entrega:** {o.get('fecha_entrega', 'N/D')}")
+                            st.write(f"**Tipo de Servicio:** {o.get('tipo_servicio', 'N/D')}")
+                        with col_info2:
+                            st.write(f"**Total:** ${o.get('total', 0)}")
+                            st.write(f"**Abono:** ${o.get('abono', 0)}")
+                            st.write(f"**Restante:** ${o.get('restante', 0)}")
+                        st.markdown("---")
+                    
+                    # Sección alineada a la derecha dentro de la orden para cambiar estado
+                    st.markdown("##### ⚙️ Cambiar Estado de la Orden")
+                    col_espacio, col_sel_est, col_btn_est = st.columns([1.5, 2.5, 1.5])
+                    
+                    with col_sel_est:
                         idx_actual = lista_estados.index(estado_actual) if estado_actual in lista_estados else 0
-                        nuevo_estado_rapido = st.selectbox(
-                            "Estado rápido", 
-                            lista_estados, 
-                            index=idx_actual, 
-                            key=f"quick_est_{o_id}", 
-                            label_visibility="collapsed"
-                        )
-                    with sub_col_btn:
-                        if st.button("💾", key=f"btn_save_quick_{o_id}", help="Guardar nuevo estado"):
-                            if nuevo_estado_rapido != estado_actual:
-                                actualizar_estado_con_historial(
-                                    o_id, estado_actual, nuevo_estado_rapido, 
-                                    historial_db, st.session_state['usuario']
-                                )
-                                st.success("✅ Actualizado")
-                                st.rerun()
-                            else:
-                                st.info("Es el mismo estado")
-
-                with col_exp:
-                    with st.expander(f"Orden #{numero_o} - {cliente_o} [Estado: {estado_actual}]"):
-                        if st.session_state['rol'] in ["Administrador", "Recepción"]:
-                            col_info1, col_info2 = st.columns(2)
-                            with col_info1:
-                                st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
-                                st.write(f"**Fecha de Entrega:** {o.get('fecha_entrega', 'N/D')}")
-                                st.write(f"**Tipo de Servicio:** {o.get('tipo_servicio', 'N/D')}")
-                            with col_info2:
-                                st.write(f"**Total:** ${o.get('total', 0)}")
-                                st.write(f"**Abono:** ${o.get('abono', 0)}")
-                                st.write(f"**Restante:** ${o.get('restante', 0)}")
-                            st.markdown("---")
-                        
-                        nuevo_estado_sel = st.selectbox("Cambiar Estado de la Orden", lista_estados, index=lista_estados.index(estado_actual) if estado_actual in lista_estados else 0, key=f"select_est_{o_id}")
-                        
-                        if nuevo_estado_sel != estado_actual:
-                            if st.button("💾 Actualizar Estado", key=f"btn_upd_est_{o_id}"):
+                        nuevo_estado_sel = st.selectbox("Nuevo Estado", lista_estados, index=idx_actual, key=f"select_est_{o_id}", label_visibility="collapsed")
+                    
+                    with col_btn_est:
+                        if st.button("Cambiar Estado", key=f"btn_upd_est_{o_id}", use_container_width=True):
+                            if nuevo_estado_sel != estado_actual:
                                 actualizar_estado_con_historial(
                                     o_id, estado_actual, nuevo_estado_sel, 
                                     historial_db, st.session_state['usuario']
                                 )
-                                st.success("✅ ¡Estado actualizado y registrado en el historial!")
+                                st.success("✅ ¡Estado actualizado!")
                                 st.rerun()
-                        
-                        st.markdown("---")
-                        st.markdown("📜 **Historial de Cambios de Estado:**")
-                        try:
-                            registros = json.loads(historial_db) if isinstance(historial_db, str) else historial_db
-                            if registros:
-                                for reg in registros:
-                                    u_cambio = reg.get('usuario', 'Desconocido')
-                                    de_est = reg.get('de', '-')
-                                    a_est = reg.get('a', '-')
-                                    f_cambio = reg.get('fecha', '-')
-                                    st.caption(f"🕒 [{f_cambio}] 👤 **{u_cambio}** cambió el estado de *{de_est}* ➡️ *{a_est}*")
                             else:
-                                st.caption("No hay cambios registrados todavía.")
-                        except Exception:
-                            st.caption("No se pudo cargar el historial.")
+                                st.info("Selecciona un estado diferente.")
+                    
+                    st.markdown("---")
+                    st.markdown("📜 **Historial de Cambios de Estado:**")
+                    try:
+                        registros = json.loads(historial_db) if isinstance(historial_db, str) else historial_db
+                        if registros:
+                            for reg in registros:
+                                u_cambio = reg.get('usuario', 'Desconocido')
+                                de_est = reg.get('de', '-')
+                                a_est = reg.get('a', '-')
+                                f_cambio = reg.get('fecha', '-')
+                                st.caption(f"🕒 [{f_cambio}] 👤 **{u_cambio}** cambió el estado de *{de_est}* ➡️ *{a_est}*")
+                        else:
+                            st.caption("No hay cambios registrados todavía.")
+                    except Exception:
+                        st.caption("No se pudo cargar el historial.")
         else:
             st.info("No hay órdenes registradas con este filtro.")
     except Exception as e:

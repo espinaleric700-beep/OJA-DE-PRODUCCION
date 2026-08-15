@@ -144,24 +144,31 @@ with tabs[0]:
                 estado_actual = o.get('estado', 'Pendiente')
                 historial_db = o.get('historial', "[]")
                 
-                col_exp, col_select = st.columns([3.5, 1.5])
+                # Dividimos en 2 columnas: una para el selector rápido con botón y otra para el expander completo
+                col_select, col_exp = st.columns([2.2, 3.8])
                 
                 with col_select:
-                    idx_actual = lista_estados.index(estado_actual) if estado_actual in lista_estados else 0
-                    nuevo_estado_rapido = st.selectbox(
-                        "Estado rápido", 
-                        lista_estados, 
-                        index=idx_actual, 
-                        key=f"quick_est_{o_id}", 
-                        label_visibility="collapsed"
-                    )
-                    if nuevo_estado_rapido != estado_actual:
-                        actualizar_estado_con_historial(
-                            o_id, estado_actual, nuevo_estado_rapido, 
-                            historial_db, st.session_state['usuario']
+                    sub_col_sel, sub_col_btn = st.columns([3, 1])
+                    with sub_col_sel:
+                        idx_actual = lista_estados.index(estado_actual) if estado_actual in lista_estados else 0
+                        nuevo_estado_rapido = st.selectbox(
+                            "Estado rápido", 
+                            lista_estados, 
+                            index=idx_actual, 
+                            key=f"quick_est_{o_id}", 
+                            label_visibility="collapsed"
                         )
-                        st.success("✅ Estado actualizado rápidamente")
-                        st.rerun()
+                    with sub_col_btn:
+                        if st.button("💾", key=f"btn_save_quick_{o_id}", help="Guardar nuevo estado"):
+                            if nuevo_estado_rapido != estado_actual:
+                                actualizar_estado_con_historial(
+                                    o_id, estado_actual, nuevo_estado_rapido, 
+                                    historial_db, st.session_state['usuario']
+                                )
+                                st.success("✅ Actualizado")
+                                st.rerun()
+                            else:
+                                st.info("Es el mismo estado")
 
                 with col_exp:
                     with st.expander(f"Orden #{numero_o} - {cliente_o} [Estado: {estado_actual}]"):

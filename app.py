@@ -16,7 +16,7 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
-# Lista por defecto para evitar "No options to select"
+# Roles por defecto
 roles_por_defecto = [
     "Administrador", "Recepción", "Diseñador", "Almacén", 
     "Producción - Bordados", "Producción - Impresión", "Transferencia Térmica"
@@ -95,16 +95,16 @@ with tabs[0]:
         ordenes = supabase.table("ordenes").select("*").execute().data
         if ordenes:
             for o in ordenes:
-                area_orden = o.get('area', 'General')
+                area_orden = o.get('area_produccion', 'General')
                 estado_actual = o.get('estado', 'Pendiente')
+                num_orden = o.get('numero_orden', 'N/A')
+                cliente = o.get('nombre_cliente', 'General')
+                nombre_ord = o.get('nombre_orden', 'Sin detalles')
                 
-                with st.expander(f"Orden #{o.get('id', 'N/A')} - Cliente: {o.get('cliente', 'General')} | Área: [{area_orden}] - Estado: {estado_actual}"):
-                    st.write(f"**Área de Trabajo:** {area_orden}")
-                    st.write(f"**Detalles:** {o.get('detalles', 'Sin detalles')}")
-                    st.write(f"**Fecha de Creación:** {o.get('fecha', 'N/A')}")
+                with st.expander(f"Orden #{num_orden} - Cliente: {cliente} | Área: [{area_orden}] - Estado: {estado_actual}"):
+                    st.write(f"**Área de Producción:** {area_orden}")
+                    st.write(f"**Nombre/Detalles de la Orden:** {nombre_ord}")
                     st.write(f"📌 **Estado Actual:** {estado_actual}")
-                    
-                    # Botones de cambio de estado basados en roles y flujo solicitado:
                     
                     # 1. Rol Diseñador: Puede enviar a recepción
                     if rol_lower == "diseñador" and estado_actual == "Pendiente":
@@ -116,10 +116,10 @@ with tabs[0]:
                             except Exception as ex:
                                 st.error(f"Error: {ex}")
 
-                    # 2. Roles de Producción y Almacén: Enviar a producción / marcar listo / completado
-                    es_produccion_area = (rol_lower == "producción - bordados" and area_orden == "Bordado") or \
-                                         (rol_lower == "producción - impresión" and area_orden == "Impresión")
-                    es_almacen = rol_lower == "almacén" or rol_lower == "almacen"
+                    # 2. Roles de Producción y Almacén
+                    es_produccion_area = (rol_lower == "producción - bordados" and area_orden == "Bordados") or \
+                                         (rol_lower == "producción - impresión" and area_orden == "Impresion")
+                    es_almacen = rol_lower in ["almacén", "almacen"]
 
                     if es_produccion_area or es_almacen:
                         if estado_actual in ["Enviado a Recepción", "Pendiente"]:
@@ -134,10 +134,8 @@ with tabs[0]:
                         if estado_actual == "En Producción":
                             if es_almacen and st.button("✔️ Marcar Listo (Almacén)", key=f"btn_alm_{o.get('id')}"):
                                 try:
-                                    # Si almacén da listo y producción ya completó o completamos ambos, regresa a recepción
-                                    nuevo_est = "Listo en Almacén" if o.get('estado_produccion') != "Completado" else "Regresado a Recepción"
-                                    supabase.table("ordenes").update({"estado_almacen": "Listo", "estado": nuevo_est}).eq("id", o.get("id")).execute()
-                                    st.success("✅ Almacén actualizado.")
+                                    supabase.table("ordenes").update({"estado": "Regresado a Recepción"}).eq("id", o.get("id")).execute()
+                                    st.success("✅ Almacén actualizado. Orden devuelta a Recepción.")
                                     st.rerun()
                                 except Exception as ex:
                                     st.error(f"Error: {ex}")
@@ -174,11 +172,10 @@ with tabs[0]:
                             except Exception as ex:
                                 st.error(f"Error al procesar la entrega: {ex}")
 
-                    # Mostrar factura si existe
                     if o.get('factura_url'):
                         st.markdown(f"📄 [Ver Factura Adjunta]({o.get('factura_url')})")
 
-                    # Visualización de archivos adjuntos iniciales
+                    # Archivos adjuntos
                     imagenes = o.get('imagen_url')
                     if imagenes:
                         if isinstance(imagenes, str):
@@ -186,7 +183,7 @@ with tabs[0]:
                         else:
                             lista_archivos = imagenes
                         
-                        st.write("**Archivos y Diseños Iniciales:**")
+                        st.write("**Archivos y Diseños Adjuntos:**")
                         for idx, archivo_url in enumerate(lista_archivos):
                             nombre_archivo = archivo_url.split("/")[-1]
                             if archivo_url.lower().endswith(('.png', '.jpg', '.jpeg', '.svg')):
@@ -210,8 +207,8 @@ with tabs[1]:
         st.subheader("➕ Crear Nueva Orden")
         with st.form("form_nueva_orden", clear_on_submit=True):
             cliente = st.text_input("Nombre del Cliente")
-            area = st.selectbox("Área de Producción", ["Bordado", "Impresión"])
-            detalles = st.text_area("Detalles del Diseño / Requerimientos")
+            nombre_ord = st.text_input("Nombre de la Orden / Detalles")
+            area = st.selectbox("Área de Producción", ["Bordados", "Impresion"])
             
             formatos_soportados = ["pdf", "png", "jpg", "jpeg", "ia", "psd", "cdr", "emb", "eps", "dst", "tbf", "svg"]
             archivos = st.file_uploader(
@@ -230,13 +227,16 @@ with tabs[1]:
                     
                     archivos_str = ",".join(urls_archivos)
                     
+                    # Generamos un número de orden automático (ej: ORD-20260815...)
+                    num_orden_auto = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    
                     supabase.table("ordenes").insert({
-                        "cliente": cliente,
-                        "area": area,
-                        "detalles": detalles,
+                        "numero_orden": num_orden_auto,
+                        "nombre_cliente": cliente,
+                        "nombre_orden": nombre_ord,
+                        "area_produccion": area,
                         "imagen_url": archivos_str,
-                        "estado": "Pendiente",
-                        "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        "estado": "Pendiente"
                     }).execute()
                     st.success("✅ Orden creada con éxito.")
                 except Exception as e:

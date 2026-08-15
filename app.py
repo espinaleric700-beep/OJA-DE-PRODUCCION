@@ -266,7 +266,27 @@ with tabs[2]:
                     
                     if es_avanzado and dict_colores:
                         lista_cols = list(dict_colores.keys())
-                        color_seleccionado_ver = st.selectbox("🎨 Selecciona el color (la imagen cambiará):", lista_cols, key=f"ver_col_avanzado_{item_id}")
+                        
+                        # Selector en forma de Botones horizontales (Pills) para hacer clic directo
+                        st.markdown("🎨 **Selecciona el color (la imagen cambiará):**")
+                        key_pills = f"pills_color_{item_id}"
+                        if key_pills not in st.session_state:
+                            st.session_state[key_pills] = lista_cols[0]
+                        
+                        # Si el color seleccionado ya no existe en la lista, reiniciamos al primero
+                        if st.session_state[key_pills] not in lista_cols:
+                            st.session_state[key_pills] = lista_cols[0]
+
+                        cols_colores = st.columns(len(lista_cols))
+                        for idx, col_name in enumerate(lista_cols):
+                            with cols_colores[idx]:
+                                es_seleccionado = (st.session_state[key_pills] == col_name)
+                                estilo_btn = "primary" if es_seleccionado else "secondary"
+                                if st.button(col_name, key=f"btn_col_{item_id}_{col_name}", type=estilo_btn):
+                                    st.session_state[key_pills] = col_name
+                                    st.rerun()
+
+                        color_seleccionado_ver = st.session_state[key_pills]
                         
                         col_img, col_info = st.columns([1, 3])
                         

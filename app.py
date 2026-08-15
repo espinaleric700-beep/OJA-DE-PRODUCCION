@@ -17,7 +17,7 @@ st.markdown("""
     div.streamlit-expanderHeader { background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; color: #f9fafb; font-weight: 600; }
     div[data-testid="stForm"] { background-color: #111827; border: 1px solid #374151; border-radius: 10px; padding: 10px; }
     p, label, span, div { color: #e5e7eb; }
-    .stButton > button { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-radius: 8px; border: none; font-weight: 600; padding: 0.35rem 0.75rem; width: 100%; min-height: 2.2rem; margin-top: 1.6rem; }
+    .stButton > button { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-radius: 6px; border: none; font-weight: 600; padding: 0.2rem 0.5rem; width: 100%; min-height: 1.8rem; margin-top: 0rem; }
     [data-testid="stSidebar"] { background-color: #030712; border-right: 1px solid #1f2937; }
     </style>
 """, unsafe_allow_html=True)
@@ -263,8 +263,6 @@ with tabs[2]:
                         st.markdown("#### 📏 Tallas y Existencias:")
                         
                         if dict_tallas:
-                            # Contenedor con altura fija y scroll interno para mantener la altura alineada con la imagen
-                            tallas_html = "<div style='max-height: 280px; overflow-y: auto; padding-right: 5px;'>"
                             cols_por_fila = 4
                             tallas_items = list(dict_tallas.items())
                             
@@ -274,23 +272,26 @@ with tabs[2]:
                                     if i + j < len(tallas_items):
                                         talla, cantidad = tallas_items[i + j]
                                         with fila_cols[j]:
-                                            st.markdown(f"<div style='background-color: #111827; padding: 5px; border-radius: 6px; border: 1px solid #1f2937; text-align: center; margin-bottom: 2px;'><b>{talla}</b><br><span style='font-size: 1em; color: #60a5fa;'>{cantidad}</span></div>", unsafe_allow_html=True)
-                                            
                                             if puede_modificar:
-                                                sub_c1, sub_c2 = st.columns(2)
-                                                with sub_c1:
+                                                # Tarjeta compacta con botones integrados al lado de la cantidad
+                                                sub_c_btn1, sub_c_txt, sub_c_btn2 = st.columns([1, 2, 1])
+                                                with sub_c_btn1:
                                                     if st.button("➖", key=f"m_{item_id}_{talla}"):
                                                         if cantidad > 0:
                                                             dict_tallas[talla] = cantidad - 1
                                                             nuevo_str = ", ".join([f"{tk}: {tv}" for tk, tv in dict_tallas.items()])
                                                             supabase.table("almacen").update({"tallas_existencias": nuevo_str}).eq("id", item_id).execute()
                                                             st.rerun()
-                                                with sub_c2:
+                                                with sub_c_txt:
+                                                    st.markdown(f"<div style='background-color: #111827; padding: 4px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold;'>{talla}</span><br><span style='font-size: 0.9em; color: #60a5fa;'>{cantidad}</span></div>", unsafe_allow_html=True)
+                                                with sub_c_btn2:
                                                     if st.button("➕", key=f"p_{item_id}_{talla}"):
                                                         dict_tallas[talla] = cantidad + 1
                                                         nuevo_str = ", ".join([f"{tk}: {tv}" for tk, tv in dict_tallas.items()])
                                                         supabase.table("almacen").update({"tallas_existencias": nuevo_str}).eq("id", item_id).execute()
                                                         st.rerun()
+                                            else:
+                                                st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 6px; border: 1px solid #1f2937; text-align: center;'><b>{talla}</b><br><span style='color: #60a5fa;'>{cantidad}</span></div>", unsafe_allow_html=True)
                         else:
                             st.info("No hay tallas definidas.")
                         

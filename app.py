@@ -20,7 +20,6 @@ st.markdown("""
     p, label, span, div { color: #e5e7eb; }
     .stButton > button { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-radius: 6px; border: none; font-weight: 600; padding: 0.2rem 0.4rem; width: 100%; min-height: 1.8rem; margin-top: 0rem; }
     [data-testid="stSidebar"] { background-color: #030712; border-right: 1px solid #1f2937; }
-    [data-testid="column"] { padding: 0px 2px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -273,52 +272,38 @@ with tabs[2]:
                         if key_pills not in st.session_state or st.session_state[key_pills] not in lista_cols:
                             st.session_state[key_pills] = lista_cols[0]
 
-                        # Estilos CSS para convertir los botones en círculos de colores pegados estilo paleta
-                        st.markdown("""
-                            <style>
-                            .circle-palette { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
-                            .circle-palette div[data-testid="column"] { width: auto !important; flex: 0 0 auto !important; padding: 0px !important; margin: 0px !important; }
-                            .circle-palette .stButton > button {
-                                width: 34px !important;
-                                height: 34px !important;
-                                min-height: 34px !important;
-                                border-radius: 50% !important;
-                                padding: 0px !important;
-                                font-size: 0px !important;
-                                box-shadow: inset 0 0 0 3px #ffffff, 0 2px 4px rgba(0,0,0,0.3);
-                                transition: transform 0.1s ease;
-                            }
-                            .circle-palette .stButton > button:hover {
-                                transform: scale(1.1);
-                            }
-                            </style>
-                        """, unsafe_allow_html=True)
+                        color_seleccionado_ver = st.session_state[key_pills]
 
                         st.markdown("Colores")
-                        st.markdown('<div class="circle-palette">', unsafe_allow_html=True)
-                        cols_colores = st.columns(len(lista_cols), gap="small")
-                        for idx, col_name in enumerate(lista_cols):
-                            with cols_colores[idx]:
-                                info_col = dict_colores[col_name]
-                                color_hex = info_col.get("hex", "#3b82f6") if isinstance(info_col, dict) else "#3b82f6"
-                                es_seleccionado = (st.session_state[key_pills] == col_name)
-                                
-                                # Anillo exterior doble si está seleccionado (exactamente como en la referencia visual)
-                                ring_style = "box-shadow: 0 0 0 2px #0b0f19, 0 0 0 4px #3b82f6, inset 0 0 0 3px #ffffff !important;" if es_seleccionado else "box-shadow: inset 0 0 0 3px #ffffff, 0 2px 4px rgba(0,0,0,0.3) !important;"
-                                
-                                st.markdown(f"""
-                                    <style>
-                                    div.stButton > button#btn_circle_{item_id}_{idx} {{
-                                        background-color: {color_hex} !important;
-                                        {ring_style}
-                                    }}
-                                    </style>
-                                """, unsafe_allow_html=True)
-                                
-                                if st.button(col_name, key=f"btn_circle_{item_id}_{idx}", help=col_name):
-                                    st.session_state[key_pills] = col_name
-                                    st.rerun()
-                        st.markdown('</div>', unsafe_allow_html=True)
+                        
+                        # Generar botones en HTML puro con diseño de círculos compactos y pegados uno al lado del otro
+                        botones_html = '<div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">'
+                        for col_name in lista_cols:
+                            info_col = dict_colores[col_name]
+                            color_hex = info_col.get("hex", "#3b82f6") if isinstance(info_col, dict) else "#3b82f6"
+                            es_seleccionado = (color_seleccionado_ver == col_name)
+                            
+                            # Estilo del anillo doble si está seleccionado
+                            borde_estilo = "box-shadow: 0 0 0 2px #0b0f19, 0 0 0 4px #3b82f6, inset 0 0 0 3px #ffffff;" if es_seleccionado else "box-shadow: inset 0 0 0 3px #ffffff, 0 2px 4px rgba(0,0,0,0.3);"
+                            
+                            botones_html += f'''
+                                <button onclick="window.location.href='?item_{item_id}={col_name}'" 
+                                        title="{col_name}"
+                                        style="background-color: {color_hex}; width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer; {borde_estilo} transition: transform 0.1s ease;">
+                                </button>
+                            '''
+                        botones_html += '</div>'
+                        
+                        st.markdown(botones_html, unsafe_allow_html=True)
+
+                        # Capturar parámetro por URL para cambio de estado inmediato sin recargas complejas de columnas
+                        params = st.query_params
+                        param_key = f"item_{item_id}"
+                        if param_key in params:
+                            nuevo_sel = params[param_key]
+                            if nuevo_sel in lista_cols and st.session_state[key_pills] != nuevo_sel:
+                                st.session_state[key_pills] = nuevo_sel
+                                st.rerun()
 
                         color_seleccionado_ver = st.session_state[key_pills]
                         

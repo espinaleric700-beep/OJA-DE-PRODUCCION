@@ -52,7 +52,6 @@ lista_estados = [
 tallas_disponibles = ["2", "4", "6", "8", "10", "12", "14", "16", "S", "M", "WS", "WM", "L", "XL", "2XL"]
 
 def limpiar_nombre_archivo(nombre):
-    # Reemplaza espacios y caracteres especiales para evitar errores en Supabase Storage
     return re.sub(r'[^a-zA-Z0-9_.-]', '_', nombre)
 
 def subir_a_supabase(file_bytes, file_name, bucket="disenos"):

@@ -986,7 +986,7 @@ with tabs[2]:
         else:
             st.caption("No hay productos registrados en el almacén.")
     except Exception as e:
-        st.error(f"❌ Error al consultar la tabla 'almacen' em Supabase: {e}")
+        st.error(f"❌ Error al consultar la tabla 'almacen' en Supabase: {e}")
 
 # ==============================================================================
 # TAB 4: USUARIOS

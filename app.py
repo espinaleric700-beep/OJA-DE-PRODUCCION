@@ -261,11 +261,11 @@ def subir_a_supabase(file_bytes, file_name, bucket="disenos", carpeta="almacen")
 
 def obtener_siguiente_numero_orden():
     try:
-        res = supabase.table("ordenes").select("nombre_orden").execute()
+        res = supabase.table("ordenes").select("numero_orden").execute()
         if res.data:
             numeros = []
             for row in res.data:
-                val = row.get("nombre_orden", "")
+                val = row.get("numero_orden", "")
                 nums_encontrados = re.findall(r'\d+', str(val))
                 if nums_encontrados:
                     numeros.append(int(nums_encontrados[-1]))
@@ -387,12 +387,12 @@ with tabs[0]:
         
         if busqueda:
             termino = busqueda.lower()
-            ordenes = [o for o in ordenes if termino in str(o.get("nombre_orden", "")).lower() or termino in o.get("nombre_cliente", "").lower()]
+            ordenes = [o for o in ordenes if termino in str(o.get("numero_orden", "")).lower() or termino in o.get("nombre_cliente", "").lower()]
         
         if ordenes:
             for o in ordenes:
                 o_id = o.get("id")
-                numero_o = o.get('nombre_orden', 'S/N')
+                numero_o = o.get('numero_orden', 'S/N')
                 cliente_o = o.get('nombre_cliente', 'Sin cliente')
                 estado_actual = o.get('estado', 'Pendiente')
                 historial_db = o.get('historial', "[]")
@@ -634,7 +634,7 @@ with tabs[1]:
                 }])
                 
                 supabase.table("ordenes").insert({
-                    "nombre_orden": numero_auto,
+                    "numero_orden": numero_auto,
                     "nombre_cliente": nombre_cliente,
                     "telefono": telefono_cliente,
                     "tipo_servicio": tipo_servicio,

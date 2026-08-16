@@ -112,21 +112,21 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
     }
 
-    /* Tarjeta contenedora con fondo claro especial para resaltar las imágenes de prendas */
+    /* Ajuste para imágenes PNG transparentes sobre el fondo oscuro de la app */
     [data-testid="stImage"] {
         display: flex;
         justify-content: center;
         align-items: center;
-        background: #f1f5f9 !important; /* Fondo claro (Gris suave neutro) */
-        border-radius: 12px !important;
-        padding: 16px !important;
-        border: 1px solid #334155 !important;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.3) !important;
+        background: transparent !important;
+        border-radius: 0px !important;
+        padding: 0px !important;
+        border: none !important;
+        box-shadow: none !important;
     }
 
     [data-testid="stImage"] img {
-        mix-blend-mode: multiply !important;
-        filter: contrast(102%) brightness(102%);
+        mix-blend-mode: normal !important;
+        filter: drop-shadow(0px 8px 16px rgba(0, 0, 0, 0.45));
     }
 
     div[data-testid="stNumberInput"] {

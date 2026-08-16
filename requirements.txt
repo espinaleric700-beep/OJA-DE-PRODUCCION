@@ -4,4 +4,3 @@ firebase-admin
 pandas
 streamlit-autorefresh
 streamlit-js-eval
-python-dotenv

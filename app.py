@@ -687,20 +687,36 @@ with tabs[2]:
         productos = res_almacen.data if res_almacen.data else []
 
         with st.expander("➕ Agregar Nuevo Producto al Almacén"):
-            with st.form("form_nuevo_producto"):
-                nombre_prod = st.text_input("Nombre del Producto")
-                talla_prod = st.text_input("Talla (opcional o general)")
-                cant_prod = st.number_input("Cantidad en Existencia", min_value=0, value=0, step=1)
-                img_prod = st.text_input("URL de Imagen (opcional)", value="EMPTY")
+            with st.form("form_nuevo_producto_avanzado"):
+                nombre_prod = st.text_input("Nombre de la Camiseta / Producto")
+                imagen_prod_file = st.file_uploader("📷 Imagen del Producto", type=["png", "jpg", "jpeg"], key="nuevo_prod_img")
                 
-                if st.form_submit_button("💾 Guardar Producto"):
+                st.markdown("---")
+                st.markdown("🔢 **Existencia Inicial por Tallas**")
+                
+                # Columnas de tallas para el formulario de alta
+                cantidades_iniciales_alt = {}
+                cols_alta_tallas = st.columns(4)
+                for idx_t, sz in enumerate(tallas_disponibles):
+                    with cols_alta_tallas[idx_t % 4]:
+                        cantidades_iniciales_alt[sz] = st.number_input(f"Talla {sz}", min_value=0, value=0, step=1, key=f"alta_sz_{sz}")
+                
+                if st.form_submit_button("💾 Guardar Producto en Almacén"):
                     if nombre_prod.strip():
+                        url_imagen_final = "EMPTY"
+                        if imagen_prod_file is not None:
+                            with st.spinner("Subiendo imagen..."):
+                                url_imagen_final = subir_a_supabase(imagen_prod_file.getvalue(), imagen_prod_file.name, bucket="disenos", carpeta="almacen_imgs")
+                        
+                        # Filtrar solo tallas con cantidad > 0 o guardar el diccionario completo
+                        tallas_dict_limpio = {k: int(v) for k, v in cantidades_iniciales_alt.items() if v > 0}
+                        stock_total_calculado = sum(tallas_dict_limpio.values())
+                        
                         supabase.table("almacen").insert({
                             "nombre_producto": nombre_prod.strip(),
-                            "talla": talla_prod.strip() if talla_prod else None,
-                            "cant_existencia": int(cant_prod),
-                            "imagen_url": img_prod.strip() if img_prod else "EMPTY",
-                            "tallas_existencia": "{}"
+                            "cant_existencia": stock_total_calculado,
+                            "imagen_url": url_imagen_final,
+                            "tallas_existencia": json.dumps(tallas_dict_limpio)
                         }).execute()
                         st.success("¡Producto agregado con éxito!")
                         st.rerun()
@@ -712,21 +728,106 @@ with tabs[2]:
             for prod in productos:
                 p_id = prod.get("id")
                 p_nombre = prod.get("nombre_producto", "Sin nombre")
-                p_cant = prod.get("cant_existencia", 0)
-                p_talla = prod.get("talla", "N/A")
+                p_imagen = prod.get("imagen_url", "EMPTY")
+                p_tallas_db = prod.get("tallas_existencia", "{}")
                 
+                # Parsear el JSON de existencias por talla
+                try:
+                    if isinstance(p_tallas_db, str):
+                        tallas_dict = json.loads(p_tallas_db) if p_tallas_db else {}
+                    elif isinstance(p_tallas_db, dict):
+                        tallas_dict = p_tallas_db
+                    else:
+                        tallas_dict = {}
+                except:
+                    tallas_dict = {}
+
+                stock_total_actual = sum(int(v) for v in tallas_dict.values()) if tallas_dict else int(prod.get("cant_existencia", 0))
+
                 with st.container(border=True):
-                    col_p1, col_p2, col_p3 = st.columns([2, 1, 1])
-                    with col_p1:
+                    col_img, col_info = st.columns([1, 2.5])
+                    
+                    with col_img:
+                        if p_imagen and p_imagen != "EMPTY" and p_imagen.startswith("http"):
+                            st.image(p_imagen, use_column_width=True)
+                        else:
+                            st.info("Sin imagen adjunta")
+                            
+                        # Subir / Actualizar imagen individualmente
+                        nueva_img_file = st.file_uploader(f"Cambiar imagen", type=["png", "jpg", "jpeg"], key=f"up_img_{p_id}")
+                        if nueva_img_file is not None:
+                            if st.button("Subir Nueva Imagen", key=f"btn_up_img_{p_id}"):
+                                with st.spinner("Actualizando imagen..."):
+                                    nueva_url = subir_a_supabase(nueva_img_file.getvalue(), nueva_img_file.name, bucket="disenos", carpeta="almacen_imgs")
+                                    supabase.table("almacen").update({"imagen_url": nueva_url}).eq("id", p_id).execute()
+                                    st.success("¡Imagen actualizada!")
+                                    st.rerun()
+
+                    with col_info:
                         st.markdown(f"### 🏷️ {p_nombre}")
-                        st.caption(f"Talla general: {p_talla} | Stock total: {p_cant}")
-                    with col_p2:
-                        nueva_cant = st.number_input(f"Stock ID {p_id}", min_value=0, value=int(p_cant), step=1, key=f"stock_input_{p_id}", label_visibility="collapsed")
-                    with col_p3:
-                        if st.button("Actualizar Stock", key=f"btn_update_stock_{p_id}"):
-                            supabase.table("almacen").update({"cant_existencia": int(nueva_cant)}).eq("id", p_id).execute()
-                            st.success("¡Stock actualizado!")
+                        st.markdown(f"**Stock Total General:** `{stock_total_actual} piezas`")
+                        
+                        st.markdown("📊 **Inventario Detallado por Talla:**")
+                        
+                        # Mostrar tabla visual de stock por talla si existe
+                        if tallas_dict:
+                            th_html = ""
+                            td_html = ""
+                            for sz in tallas_disponibles:
+                                val_sz = tallas_dict.get(sz, 0)
+                                if val_sz > 0:
+                                    th_html += f"<th>{sz}</th>"
+                                    td_html += f"<td>{val_sz}</td>"
+                            if th_html:
+                                grid_table_html = f"""
+                                <table class="inventory-grid-table">
+                                    <tr>{th_html}</tr>
+                                    <tr>{td_html}</tr>
+                                </table>
+                                """
+                                st.markdown(grid_table_html, unsafe_allow_html=True)
+                            else:
+                                st.caption("No hay existencias registradas por talla individualmente.")
+                        else:
+                            st.caption("Sin desglose de tallas configurado.")
+
+                        # Formulario para editar tallas y existencias de este producto
+                        edit_inv_key = f"edit_inv_{p_id}"
+                        if edit_inv_key not in st.session_state:
+                            st.session_state[edit_inv_key] = False
+
+                        if st.button("✏️ Editar Stock por Tallas", key=f"btn_toggle_inv_{p_id}"):
+                            st.session_state[edit_inv_key] = not st.session_state[edit_inv_key]
                             st.rerun()
+
+                        if st.session_state[edit_inv_key]:
+                            with st.form(key=f"form_edit_inv_{p_id}"):
+                                st.markdown("Modifica las cantidades para cada talla:")
+                                temp_nuevas_tallas = {}
+                                cols_edit_sz = st.columns(4)
+                                for idx_sz, sz in enumerate(tallas_disponibles):
+                                    val_actual_sz = int(tallas_dict.get(sz, 0))
+                                    with cols_edit_sz[idx_sz % 4]:
+                                        nv = st.number_input(f"Talla {sz}", min_value=0, value=val_actual_sz, step=1, key=f"edit_sz_{p_id}_{sz}")
+                                        if nv > 0:
+                                            temp_nuevas_tallas[sz] = int(nv)
+                                            
+                                if st.form_submit_button("💾 Guardar Cambios de Stock"):
+                                    nuevo_total_calc = sum(temp_nuevas_tallas.values())
+                                    supabase.table("almacen").update({
+                                        "cant_existencia": nuevo_total_calc,
+                                        "tallas_existencia": json.dumps(temp_nuevas_tallas)
+                                    }).eq("id", p_id).execute()
+                                    st.session_state[edit_inv_key] = False
+                                    st.success("¡Stock por tallas actualizado correctamente!")
+                                    st.rerun()
+
+                        if st.session_state['rol'] == "Administrador":
+                            st.markdown("---")
+                            if st.button(f"🗑️ Eliminar Producto '{p_nombre}'", key=f"btn_del_prod_{p_id}"):
+                                supabase.table("almacen").delete().eq("id", p_id).execute()
+                                st.success("Producto eliminado del almacén.")
+                                st.rerun()
         else:
             st.info("No hay productos registrados en el almacén.")
             

@@ -13,15 +13,10 @@ import threading
 import time
 import urllib.request
 
-# Reemplaza esta URL con la URL exacta y pública de tu aplicación Streamlit
 URL_DE_MI_APP = "https://tu-app.streamlit.app"  # <--- COLOCA TU URL AQUÍ
 
 def keep_server_alive_loop(app_url, interval_seconds=300):
-    """
-    Bucle en segundo plano que envía una petición HTTP a la app cada 5 minutos
-    para evitar que Streamlit Cloud la ponga en hibernación por inactividad.
-    """
-    time.sleep(10)  # Espera inicial para permitir el despliegue del servidor
+    time.sleep(10)
     while True:
         try:
             req = urllib.request.Request(
@@ -30,17 +25,15 @@ def keep_server_alive_loop(app_url, interval_seconds=300):
             )
             with urllib.request.urlopen(req, timeout=10) as response:
                 pass
-        except Exception as e:
-            # En caso de error puntual de red, el hilo continúa intentándolo
+        except Exception:
             pass
         time.sleep(interval_seconds)
 
-# Inicia el hilo en segundo plano solo una vez por proceso de la aplicación
 if "keep_alive_thread_started" not in st.session_state:
     st.session_state["keep_alive_thread_started"] = True
     ping_thread = threading.Thread(
         target=keep_server_alive_loop, 
-        args=(URL_DE_MI_APP, 300),  # Envía ping cada 5 minutos (300 segundos)
+        args=(URL_DE_MI_APP, 300),
         daemon=True
     )
     ping_thread.start()
@@ -50,7 +43,6 @@ if "keep_alive_thread_started" not in st.session_state:
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
-# MÓDULO KEEP-ALIVE EN PESTAÑA DEL NAVEGADOR
 components.html(
     """
     <script>
@@ -61,7 +53,6 @@ components.html(
             console.log('Keep-alive ping error:', err);
         });
     }
-    // Enviar un ping silencioso desde la pestaña del navegador cada 2 minutos
     setInterval(keepAlive, 120000);
     </script>
     """,
@@ -76,7 +67,19 @@ st.markdown("""
     div[data-testid="stForm"] { background-color: #111827; border: 1px solid #374151; border-radius: 10px; padding: 10px; }
     p, label, span, div { color: #e5e7eb; }
     .stButton > button { border-radius: 4px; border: none; font-weight: 600; padding: 0.3rem 0.6rem; min-height: 2rem; font-size: 0.8rem; }
-    [data-testid="stSidebar"] { background-color: #030712; border-right: 1px solid #1f2937; }
+    
+    /* Ocultar la barra lateral nativa de Streamlit completamente */
+    [data-testid="stSidebar"] { display: none; }
+    [data-testid="collapsedControl"] { display: none; }
+    
+    /* Estilo para la caja del perfil en la cabecera */
+    .user-card {
+        background-color: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 0.85rem;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -137,45 +140,66 @@ if "autenticado" not in st.session_state: st.session_state.update({"autenticado"
 if "colores_inventario_avanzado" not in st.session_state: st.session_state["colores_inventario_avanzado"] = {}
 if "sync_trigger" not in st.session_state: st.session_state["sync_trigger"] = 0
 
-# --- Autenticación y Barra Lateral ---
-if not st.session_state["autenticado"]:
-    st.sidebar.title("🔐 Control de Acceso")
-    usuario_input = st.sidebar.text_input("Usuario")
-    password_input = st.sidebar.text_input("Contraseña", type="password")
-    if st.sidebar.button("Iniciar Sesión"):
-        if usuario_input.strip().lower() == "admin" and password_input == "2580Admin":
-            st.session_state.update({"autenticado": True, "usuario": "admin", "rol": "Administrador"})
-            st.rerun()
-        else:
-            try:
-                res = supabase.table("usuarios").select("*").execute()
-                usuario_encontrado = next((u for u in res.data if u["usuario"].lower() == usuario_input.lower() and u["password"] == password_input), None)
-                if usuario_encontrado:
-                    st.session_state.update({"autenticado": True, "usuario": usuario_input, "rol": usuario_encontrado.get("rol_id", "")})
-                    st.rerun()
-                else: st.sidebar.error("❌ Usuario o contraseña incorrectos.")
-            except Exception as e: st.sidebar.error(f"Error: {e}")
-    st.stop()
-
-st.sidebar.markdown("### 🔐 Control de Acceso")
-st.sidebar.success(f"👋 ¡Bienvenido, **{st.session_state['usuario']}**!\n\nRol: *{st.session_state['rol']}*")
-
-st.sidebar.markdown("---")
-
-# 1. Configuración del Auto-Refresh cada 10,000 milisegundos (10 segundos)
+# --- Auto-Refresh ---
 count = st_autorefresh(interval=10000, key="datasync_counter")
 
-if count > 0:
-    pass
+# ==============================================================================
+# ENCABEZADO Y CONTROL DE ACCESO SUPERIOR (SIN BARRA LATERAL)
+# ==============================================================================
+col_titulo, col_header_info = st.columns([1.2, 2])
 
-# 2. Botón opcional manual conservado en la barra lateral
-if st.sidebar.button("🔄 Sincronizar / Refrescar Datos", use_container_width=True):
-    st.session_state["sync_trigger"] += 1
-    st.rerun()
+with col_titulo:
+    st.title("🧵 Pixel Thread")
 
-st.sidebar.button("🚪 Cerrar Sesión", on_click=lambda: st.session_state.update({"autenticado": False}))
+with col_header_info:
+    if not st.session_state["autenticado"]:
+        st.markdown("#### 🔐 Control de Acceso")
+        col_u, col_p, col_b = st.columns([2, 2, 1])
+        with col_u:
+            usuario_input = st.text_input("Usuario", key="login_user_top", label_visibility="collapsed", placeholder="Usuario")
+        with col_p:
+            password_input = st.text_input("Contraseña", type="password", key="login_pass_top", label_visibility="collapsed", placeholder="Contraseña")
+        with col_b:
+            if st.button("Iniciar Sesión", key="btn_login_top", use_container_width=True):
+                if usuario_input.strip().lower() == "admin" and password_input == "2580Admin":
+                    st.session_state.update({"autenticado": True, "usuario": "admin", "rol": "Administrador"})
+                    st.rerun()
+                else:
+                    try:
+                        res = supabase.table("usuarios").select("*").execute()
+                        usuario_encontrado = next((u for u in res.data if u["usuario"].lower() == usuario_input.lower() and u["password"] == password_input), None)
+                        if usuario_encontrado:
+                            st.session_state.update({"autenticado": True, "usuario": usuario_input, "rol": usuario_encontrado.get("rol_id", "")})
+                            st.rerun()
+                        else: st.error("❌ Credenciales incorrectas.")
+                    except Exception as e: st.error(f"Error: {e}")
+        st.stop()
+    else:
+        # Usuario Autenticado en la cabecera superior
+        col_user_box, col_btn_sync, col_btn_logout = st.columns([2, 1.2, 1])
+        
+        with col_user_box:
+            st.markdown(
+                f"""
+                <div class="user-card">
+                    👋 <b>{st.session_state['usuario']}</b> | Rol: <i>{st.session_state['rol']}</i>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+        
+        with col_btn_sync:
+            if st.button("🔄 Refrescar", key="top_sync_btn", use_container_width=True):
+                st.session_state["sync_trigger"] += 1
+                st.rerun()
+                
+        with col_btn_logout:
+            if st.button("🚪 Salir", key="top_logout_btn", use_container_width=True):
+                st.session_state.update({"autenticado": False})
+                st.rerun()
 
-st.title("🧵 Pixel Thread - Gestión")
+st.markdown("---")
+
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "📦 Almacén", "⚙️ Usuarios"])
 
 with tabs[0]:

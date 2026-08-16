@@ -1,18 +1,17 @@
 from datetime import datetime
-import streamlit as st
-import streamlit.components.v1 as components
-from supabase import create_client
 import json
 import re
-from streamlit_autorefresh import st_autorefresh
-
-# ==============================================================================
-# MÓDULO AUTO-PING EN SEGUNDO PLANO (SIN SERVICIOS EXTERNOS)
-# ==============================================================================
 import threading
 import time
 import urllib.request
+import streamlit as st
+import streamlit.components.v1 as components
+from streamlit_autorefresh import st_autorefresh
+from supabase import create_client
 
+# ==============================================================================
+# MÓDULO AUTO-PING EN SEGUNDO PLANO
+# ==============================================================================
 URL_DE_MI_APP = "https://tu-app.streamlit.app"  # <--- COLOCA TU URL AQUÍ
 
 def keep_server_alive_loop(app_url, interval_seconds=300):
@@ -38,27 +37,21 @@ if "keep_alive_thread_started" not in st.session_state:
     )
     ping_thread.start()
 
-# ==========================================
-# CONFIGURACIÓN Y ESTILO VISUAL (CORREGIDO PARA MÓVIL)
-# ==========================================
+# ==============================================================================
+# CONFIGURACIÓN Y ESTILO VISUAL (FORZADO SIDE-BY-SIDE PARA MÓVIL)
+# ==============================================================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
-# Inyección de Viewport + KeepAlive
 components.html(
     """
     <script>
-    // Asegurar viewport correcto en móviles sin zoom no deseado
     const meta = document.createElement('meta');
     meta.name = 'viewport';
     meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
     document.getElementsByTagName('head')[0].appendChild(meta);
 
     function keepAlive() {
-        fetch(window.location.href, {mode: 'no-cors'}).then(() => {
-            console.log('Keep-alive ping sent successfully');
-        }).catch((err) => {
-            console.log('Keep-alive ping error:', err);
-        });
+        fetch(window.location.href, {mode: 'no-cors'}).catch((err) => {});
     }
     setInterval(keepAlive, 120000);
     </script>
@@ -67,7 +60,6 @@ components.html(
     width=0
 )
 
-# Estilos CSS generales y optimizados para móviles
 st.markdown("""
     <style>
     /* Fondo principal y textos */
@@ -85,7 +77,7 @@ st.markdown("""
         font-size: 0.85rem;
     }
 
-    /* Mejora de contraste y botones */
+    /* Mejora de botones */
     .stButton > button {
         border-radius: 6px !important;
         font-weight: 600 !important;
@@ -99,46 +91,55 @@ st.markdown("""
         color: #38bdf8 !important;
     }
 
-    /* Formato de selectores de color (st.radio horizontal) */
-    div[data-testid="stMarkdownContainer"] p {
-        font-weight: 500;
-    }
-
     /* ==========================================================================
-       OPTIMIZACIÓN ESPECÍFICA PARA PANTALLAS MÓVILES (<768px)
+       OPTIMIZACIÓN MÓVIL: MANTENER VISTA PARALELA (CAMISETA Y TALLAS LADO A LADO)
        ========================================================================== */
     @media (max-width: 768px) {
         .block-container {
-            padding-left: 0.5rem !important;
-            padding-right: 0.5rem !important;
-            padding-top: 1rem !important;
+            padding-left: 0.4rem !important;
+            padding-right: 0.4rem !important;
+            padding-top: 0.8rem !important;
         }
 
-        /* Apilar columnas solo en elementos de formulario estándar */
-        div[data-testid="column"]:not(.keep-inline) {
-            width: 100% !important;
-            flex: 1 1 100% !important;
-            min-width: 100% !important;
-            margin-bottom: 0.3rem;
+        /* CONTENEDOR PARALELO EN MÓVIL */
+        div[data-testid="stHorizontalBlock"].side-by-side-container {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            gap: 8px !important;
         }
 
-        /* Pestañas táctiles y scrolleables */
+        /* Fuerza 50% de ancho a cada columna dentro del contenedor paralelo */
+        div[data-testid="stHorizontalBlock"].side-by-side-container > div[data-testid="column"] {
+            width: 50% !important;
+            flex: 1 1 50% !important;
+            min-width: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        /* Ajustes de escala para la vista dividida */
+        .stImage img {
+            max-height: 220px !important;
+            object-fit: contain !important;
+        }
+
+        .stNumberInput input {
+            font-size: 12px !important;
+            padding: 2px 4px !important;
+        }
+
         div[data-baseweb="tab-list"] {
-            gap: 4px;
+            gap: 2px;
             overflow-x: auto;
         }
         button[data-baseweb="tab"] {
-            font-size: 0.75rem !important;
-            padding: 6px 10px !important;
+            font-size: 0.72rem !important;
+            padding: 5px 8px !important;
         }
 
-        /* Tamaños de fuente ajustados */
         h1 { font-size: 1.4rem !important; }
         h2 { font-size: 1.2rem !important; }
         h3 { font-size: 1.05rem !important; }
-        .stTextInput input, .stSelectbox div, .stNumberInput input {
-            font-size: 14px !important;
-        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -200,11 +201,10 @@ if "autenticado" not in st.session_state: st.session_state.update({"autenticado"
 if "colores_inventario_avanzado" not in st.session_state: st.session_state["colores_inventario_avanzado"] = {}
 if "sync_trigger" not in st.session_state: st.session_state["sync_trigger"] = 0
 
-# --- Auto-Refresh ---
 count = st_autorefresh(interval=10000, key="datasync_counter")
 
 # ==============================================================================
-# ENCABEZADO Y CONTROL DE ACCESO SUPERIOR
+# ENCABEZADO Y CONTROL DE ACCESO
 # ==============================================================================
 col_titulo, col_header_info = st.columns([1.2, 2])
 
@@ -471,7 +471,6 @@ with tabs[2]:
                     if dict_colores:
                         lista_cols = list(dict_colores.keys())
                         
-                        # Selector compacto horizontal en lugar de lista apilada de botones
                         color_sel = st.radio(
                             "Selecciona Color:",
                             options=lista_cols,
@@ -481,6 +480,8 @@ with tabs[2]:
                         
                         data_color = dict_colores.get(color_sel, {})
                         
+                        # CONTENEDOR FLEXBOX SIDE-BY-SIDE PARA MÓVIL
+                        st.markdown('<div class="side-by-side-container">', unsafe_allow_html=True)
                         col_img, col_info = st.columns([1, 1])
                         
                         with col_img:
@@ -493,25 +494,23 @@ with tabs[2]:
                             st.markdown(f"**Tallas (`{color_sel}`):**")
                             tallas_del_color = data_color.get("tallas", {})
                             
-                            cols_tallas = st.columns(2)
-                            for idx, talla in enumerate(tallas_disponibles):
-                                col_curr = cols_tallas[idx % 2]
+                            for talla in tallas_disponibles:
                                 cantidad = int(tallas_del_color.get(talla, 0))
-                                
-                                with col_curr:
-                                    if puede_modificar:
-                                        nueva_cant = st.number_input(
-                                            f"Talla {talla}", 
-                                            min_value=0, 
-                                            step=1, 
-                                            value=cantidad, 
-                                            key=f"num_{item_id}_{color_sel}_{talla}_{trigger_val}"
-                                        )
-                                        if nueva_cant != cantidad:
-                                            dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
-                                            supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                                    else:
-                                        st.markdown(f"**{talla}:** `{cantidad:02d}`")
+                                if puede_modificar:
+                                    nueva_cant = st.number_input(
+                                        f"Talla {talla}", 
+                                        min_value=0, 
+                                        step=1, 
+                                        value=cantidad, 
+                                        key=f"num_{item_id}_{color_sel}_{talla}_{trigger_val}"
+                                    )
+                                    if nueva_cant != cantidad:
+                                        dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
+                                        supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                else:
+                                    st.markdown(f"**{talla}:** `{cantidad:02d}`")
+
+                        st.markdown('</div>', unsafe_allow_html=True)
 
                     if puede_modificar:
                         with st.expander(f"⚙️ Ajustes de {p_nombre}"):

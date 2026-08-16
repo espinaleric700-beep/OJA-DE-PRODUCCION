@@ -578,7 +578,33 @@ with tabs[1]:
     st.subheader("➕ Crear Nueva Orden")
     numero_auto = obtener_siguiente_numero_orden()
     
-    # Botones fuera del form para agregar o limpiar tallas dinámicamente
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        nombre_orden_input = st.text_input("Nombre / Referencia de la Orden", value=numero_auto, placeholder="Ej: Camisetas Corporativas o 0000001")
+        nombre_cliente = st.text_input("Nombre del Cliente")
+        telefono_cliente = st.text_input("Teléfono")
+    with col_c2:
+        tipo_servicio = st.selectbox("Tipo de Servicio", ["Bordado", "DTF", "Sublimación", "Mixto"])
+        fecha_entrega = st.date_input("Fecha Estimada de Entrega")
+    
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        total_orden = st.number_input("TOTAL ($)", min_value=0.0, step=100.0)
+    with col_m2:
+        abono_orden = st.number_input("ABONO / ANTICIPO ($)", min_value=0.0, step=100.0)
+    
+    st.markdown("---")
+    archivos_subidos = st.file_uploader(
+        "📁 Adjuntar Archivos (Múltiples formatos: PNG, JPG, PDF, EMB, DST, AI, PSD, ZIP, etc.)", 
+        type=FORMATOS_ORDEN, 
+        accept_multiple_files=True,
+        key="uploader_archivos_orden"
+    )
+    
+    observaciones = st.text_area("Observaciones Generales")
+    
+    # Bloque de tallas dinámicas situado al final (lo último que se agrega antes de guardar)
+    st.markdown("---")
     st.markdown("👕 **Selección e Información de Tallas / Sizes**")
     col_add_btn, col_clear_btn = st.columns([2, 1])
     with col_add_btn:
@@ -616,73 +642,49 @@ with tabs[1]:
         st.info("Haz clic en '➕ Agregar Talla' para añadir tallas a esta orden.")
 
     st.markdown("---")
-    with st.form("form_crear_orden_completa"):
-        col_c1, col_c2 = st.columns(2)
-        with col_c1:
-            st.text_input("Número de Orden (Auto)", value=numero_auto, disabled=True)
-            nombre_cliente = st.text_input("Nombre del Cliente")
-            telefono_cliente = st.text_input("Teléfono")
-        with col_c2:
-            tipo_servicio = st.selectbox("Tipo de Servicio", ["Bordado", "DTF", "Sublimación", "Mixto"])
-            fecha_entrega = st.date_input("Fecha Estimada de Entrega")
-        
-        col_m1, col_m2 = st.columns(2)
-        with col_m1:
-            total_orden = st.number_input("TOTAL ($)", min_value=0.0, step=100.0)
-        with col_m2:
-            abono_orden = st.number_input("ABONO / ANTICIPO ($)", min_value=0.0, step=100.0)
-        
-        st.markdown("---")
-        archivos_subidos = st.file_uploader(
-            "📁 Adjuntar Archivos (Múltiples formatos: PNG, JPG, PDF, EMB, DST, AI, PSD, ZIP, etc.)", 
-            type=FORMATOS_ORDEN, 
-            accept_multiple_files=True,
-            key="uploader_archivos_orden"
-        )
-        
-        observaciones = st.text_area("Observaciones Generales")
-        
-        if st.form_submit_button("💾 Guardar Orden"):
-            if not dict_detalle_tallas:
-                st.error("⚠️ Debes agregar al menos una talla a la orden.")
-            else:
-                try:
-                    urls_archivos = []
-                    if archivos_subidos:
-                        with st.spinner("Subiendo archivos..."):
-                            for arch in archivos_subidos:
-                                url_file = subir_a_supabase(arch.getvalue(), arch.name, bucket="disenos", carpeta="ordenes_archivos")
-                                urls_archivos.append({"nombre": arch.name, "url": url_file})
+    if st.button("💾 Guardar Orden", use_container_width=True):
+        if not nombre_orden_input.strip():
+            st.error("⚠️ Debes ingresar el nombre o número de la orden.")
+        elif not dict_detalle_tallas:
+            st.error("⚠️ Debes agregar al menos una talla a la orden.")
+        else:
+            try:
+                urls_archivos = []
+                if archivos_subidos:
+                    with st.spinner("Subiendo archivos..."):
+                        for arch in archivos_subidos:
+                            url_file = subir_a_supabase(arch.getvalue(), arch.name, bucket="disenos", carpeta="ordenes_archivos")
+                            urls_archivos.append({"nombre": arch.name, "url": url_file})
 
-                    historial_inicial = json.dumps([{
-                        "usuario": st.session_state['usuario'], 
-                        "de": "Inicio", 
-                        "a": "Pendiente", 
-                        "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    }])
-                    
-                    supabase.table("ordenes").insert({
-                        "nombre_orden": numero_auto,
-                        "nombre_cliente": nombre_cliente,
-                        "telefono": telefono_cliente,
-                        "tipo_servicio": tipo_servicio,
-                        "fecha_entrega": str(fecha_entrega),
-                        "total": total_orden,
-                        "abono": abono_orden,
-                        "restante": total_orden - abono_orden,
-                        "observaciones": observaciones,
-                        "tallas_detalle": json.dumps(dict_detalle_tallas),
-                        "archivos": json.dumps(urls_archivos),
-                        "estado_actual": "Pendiente",
-                        "historial": historial_inicial
-                    }).execute()
-                    
-                    # Limpiar las tallas dinámicas para la próxima orden
-                    st.session_state["nueva_orden_tallas_dinamicas"] = [{"talla": "S", "cantidad": 1, "comentario": ""}]
-                    st.success("¡Orden creada correctamente!")
-                    st.rerun()
-                except Exception as err:
-                    st.error(f"❌ Error al guardar la orden en Supabase: {err}")
+                historial_inicial = json.dumps([{
+                    "usuario": st.session_state['usuario'], 
+                    "de": "Inicio", 
+                    "a": "Pendiente", 
+                    "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }])
+                
+                supabase.table("ordenes").insert({
+                    "nombre_orden": nombre_orden_input.strip(),
+                    "nombre_cliente": nombre_cliente,
+                    "telefono": telefono_cliente,
+                    "tipo_servicio": tipo_servicio,
+                    "fecha_entrega": str(fecha_entrega),
+                    "total": total_orden,
+                    "abono": abono_orden,
+                    "restante": total_orden - abono_orden,
+                    "observaciones": observaciones,
+                    "tallas_detalle": json.dumps(dict_detalle_tallas),
+                    "archivos": json.dumps(urls_archivos),
+                    "estado_actual": "Pendiente",
+                    "historial": historial_inicial
+                }).execute()
+                
+                # Limpiar las tallas dinámicas para la próxima orden
+                st.session_state["nueva_orden_tallas_dinamicas"] = [{"talla": "S", "cantidad": 1, "comentario": ""}]
+                st.success("¡Orden creada correctamente!")
+                st.rerun()
+            except Exception as err:
+                st.error(f"❌ Error al guardar la orden en Supabase: {err}")
 
 # ==============================================================================
 # TAB 3: ALMACÉN

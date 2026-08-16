@@ -39,7 +39,7 @@ if "keep_alive_thread_started" not in st.session_state:
     ping_thread.start()
 
 # ==========================================
-# CONFIGURACIÓN Y ESTILO VISUAL (MODO OSCURO Y RESPONSIVO)
+# CONFIGURACIÓN Y ESTILO VISUAL (CORREGIDO PARA MÓVIL)
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
@@ -47,7 +47,7 @@ st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 components.html(
     """
     <script>
-    // Asegurar viewport correcto en móviles
+    // Asegurar viewport correcto en móviles sin zoom no deseado
     const meta = document.createElement('meta');
     meta.name = 'viewport';
     meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
@@ -67,67 +67,77 @@ components.html(
     width=0
 )
 
-# Estilos CSS generales y Media Queries para móviles
+# Estilos CSS generales y optimizados para móviles
 st.markdown("""
     <style>
-    /* Estilos generales */
+    /* Fondo principal y textos */
     .stApp { background-color: #0b0f19; color: #f3f4f6; }
-    div.streamlit-expanderHeader { background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; color: #f9fafb; font-weight: 600; }
-    div[data-testid="stForm"] { background-color: #111827; border: 1px solid #374151; border-radius: 10px; padding: 10px; }
-    p, label, span, div { color: #e5e7eb; }
-    .stButton > button { border-radius: 4px; border: none; font-weight: 600; padding: 0.3rem 0.6rem; min-height: 2rem; font-size: 0.85rem; width: 100%; }
     
-    /* Ocultar la barra lateral nativa de Streamlit completamente */
-    [data-testid="stSidebar"] { display: none; }
-    [data-testid="collapsedControl"] { display: none; }
+    /* Ocultar la barra lateral nativa de Streamlit */
+    [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
     
-    /* Estilo para la caja del perfil en la cabecera */
+    /* Estilo para la caja de información del usuario */
     .user-card {
         background-color: #111827;
         border: 1px solid #1f2937;
         border-radius: 8px;
         padding: 8px 12px;
         font-size: 0.85rem;
-        margin-bottom: 8px;
+    }
+
+    /* Mejora de contraste y botones */
+    .stButton > button {
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        background-color: #1f2937 !important;
+        color: #ffffff !important;
+        border: 1px solid #374151 !important;
+        width: 100%;
+    }
+    .stButton > button:hover {
+        background-color: #374151 !important;
+        color: #38bdf8 !important;
+    }
+
+    /* Formato de selectores de color (st.radio horizontal) */
+    div[data-testid="stMarkdownContainer"] p {
+        font-weight: 500;
     }
 
     /* ==========================================================================
-       ADAPTACIÓN PARA PANTALLAS MÓVILES (Pantallas de menos de 768px de ancho)
+       OPTIMIZACIÓN ESPECÍFICA PARA PANTALLAS MÓVILES (<768px)
        ========================================================================== */
     @media (max-width: 768px) {
-        /* Ajustar padding principal de la app */
         .block-container {
-            padding-left: 0.8rem !important;
-            padding-right: 0.8rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
             padding-top: 1rem !important;
         }
 
-        /* Convertir columnas de Streamlit en filas apiladas en móvil */
-        div[data-testid="column"] {
+        /* Apilar columnas solo en elementos de formulario estándar */
+        div[data-testid="column"]:not(.keep-inline) {
             width: 100% !important;
             flex: 1 1 100% !important;
             min-width: 100% !important;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.3rem;
         }
 
-        /* Hacer que las pestañas (Tabs) tengan texto apilado/scrolleable */
+        /* Pestañas táctiles y scrolleables */
         div[data-baseweb="tab-list"] {
             gap: 4px;
             overflow-x: auto;
         }
         button[data-baseweb="tab"] {
-            font-size: 0.8rem !important;
-            padding: 8px 10px !important;
+            font-size: 0.75rem !important;
+            padding: 6px 10px !important;
         }
 
-        /* Ajustar entradas de texto e inputs para que no desborden */
+        /* Tamaños de fuente ajustados */
+        h1 { font-size: 1.4rem !important; }
+        h2 { font-size: 1.2rem !important; }
+        h3 { font-size: 1.05rem !important; }
         .stTextInput input, .stSelectbox div, .stNumberInput input {
             font-size: 14px !important;
-        }
-
-        /* Tablas e inputs compactos */
-        div[data-testid="stForm"] {
-            padding: 8px !important;
         }
     }
     </style>
@@ -194,7 +204,7 @@ if "sync_trigger" not in st.session_state: st.session_state["sync_trigger"] = 0
 count = st_autorefresh(interval=10000, key="datasync_counter")
 
 # ==============================================================================
-# ENCABEZADO Y CONTROL DE ACCESO SUPERIOR (OPTIMIZADO MÓVIL)
+# ENCABEZADO Y CONTROL DE ACCESO SUPERIOR
 # ==============================================================================
 col_titulo, col_header_info = st.columns([1.2, 2])
 
@@ -255,9 +265,9 @@ with tabs[0]:
     st.subheader("📋 Listado de Órdenes")
     col_f1, col_f2 = st.columns(2)
     with col_f1:
-        busqueda = st.text_input("🔍 Buscar por Nombre de Cliente o # de Orden", placeholder="Ej: 0000001 o Juan Perez", key="busqueda_ordenes_input")
+        busqueda = st.text_input("🔍 Buscar Cliente o # Orden", placeholder="Ej: 0000001 o Juan Perez", key="busqueda_ordenes_input")
     with col_f2:
-        filtro_estado = st.selectbox("Filtrar por Estado", ["Todos"] + lista_estados, key="filtro_estado_ordenes_frag")
+        filtro_estado = st.selectbox("Filtrar Estado", ["Todos"] + lista_estados, key="filtro_estado_ordenes_frag")
     
     try:
         query_ordenes = supabase.table("ordenes").select("*")
@@ -272,39 +282,39 @@ with tabs[0]:
             for o in ordenes:
                 o_id = o.get("id"); numero_o = o.get('numero_orden', 'S/N'); cliente_o = o.get('nombre_cliente', 'Sin cliente'); estado_actual = o.get('estado', 'Pendiente'); historial_db = o.get('historial', "[]")
                 col_res, col_act = st.columns([2, 2])
-                with col_res: st.markdown(f"**Orden #{numero_o}** - {cliente_o} [Estado: *{estado_actual}*]")
+                with col_res: st.markdown(f"**Orden #{numero_o}** - {cliente_o}\n*Estado:* **{estado_actual}**")
                 with col_act:
                     cols_action = st.columns([2, 1])
                     idx_actual = lista_estados.index(estado_actual) if estado_actual in lista_estados else 0
                     with cols_action[0]: nuevo_estado_sel = st.selectbox("Cambiar", lista_estados, index=idx_actual, key=f"sel_quick_{o_id}", label_visibility="collapsed")
                     with cols_action[1]:
-                        if st.button("Cambiar Estado", key=f"btn_quick_{o_id}"):
+                        if st.button("Cambiar", key=f"btn_quick_{o_id}"):
                             if nuevo_estado_sel != estado_actual:
                                 actualizar_estado_con_historial(o_id, estado_actual, nuevo_estado_sel, historial_db, st.session_state['usuario'])
-                                st.success("¡Estado actualizado!")
+                                st.success("¡Actualizado!")
                                 st.rerun()
                 with st.expander("Ver detalles completos"):
                     col_info1, col_info2 = st.columns(2)
                     with col_info1:
                         if st.session_state['rol'] in ["Administrador", "Recepción"]:
                             st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
-                        st.write(f"**Fecha de Entrega:** {o.get('fecha_entrega', 'N/D')}")
-                        st.write(f"**Tipo de Servicio:** {o.get('tipo_servicio', 'N/D')}")
+                        st.write(f"**Fecha Entrega:** {o.get('fecha_entrega', 'N/D')}")
+                        st.write(f"**Servicio:** {o.get('tipo_servicio', 'N/D')}")
                     with col_info2:
                         if st.session_state['rol'] in ["Administrador", "Recepción"]:
                             st.write(f"**Total:** ${o.get('total', 0)}")
                             st.write(f"**Abono:** ${o.get('abono', 0)}")
                             st.write(f"**Restante:** ${o.get('restante', 0)}")
                     st.markdown("---")
-                    st.markdown("📜 **Historial de Cambios:**")
+                    st.markdown("📜 **Historial:**")
                     try:
                         registros = json.loads(historial_db) if isinstance(historial_db, str) else historial_db
                         if registros:
                             for reg in registros[:5]:
                                 st.caption(f"🕒 {reg.get('fecha', '-')} | 👤 {reg.get('usuario', '-')}: {reg.get('de', '')} ➡️ {reg.get('a', '')}")
-                    except: st.caption("No hay historial.")
+                    except: st.caption("Sin historial.")
                 st.divider()
-        else: st.info("No se encontraron órdenes.")
+        else: st.info("No hay órdenes encontradas.")
     except Exception as e: st.error(f"Error: {e}")
 
 with tabs[1]:
@@ -313,9 +323,9 @@ with tabs[1]:
     with st.form("form_crear_orden_completa"):
         col_c1, col_c2 = st.columns(2)
         with col_c1:
-            st.text_input("Número de Orden (Automático)", value=numero_auto, disabled=True)
+            st.text_input("Número de Orden (Auto)", value=numero_auto, disabled=True)
             nombre_cliente = st.text_input("Nombre del Cliente")
-            telefono_cliente = st.text_input("Teléfono del Cliente")
+            telefono_cliente = st.text_input("Teléfono")
         with col_c2:
             tipo_servicio = st.selectbox("Tipo de Servicio", ["Bordado", "DTF", "Sublimación", "Mixto"])
             fecha_entrega = st.date_input("Fecha Estimada de Entrega")
@@ -335,7 +345,7 @@ with tabs[1]:
                 "abono": abono_orden, "restante": total_orden - abono_orden, "observaciones": observaciones,
                 "estado": "Pendiente", "historial": historial_inicial
             }).execute()
-            st.success("¡Orden creada con éxito!")
+            st.success("¡Orden creada!")
             st.rerun()
 
 with tabs[2]:
@@ -343,20 +353,20 @@ with tabs[2]:
     puede_modificar = st.session_state['rol'] in ["Administrador", "Recepción", "Almacén"]
 
     if puede_modificar:
-        with st.expander("➕ Agregar Nuevo Producto con Colores, Tallas e Imagen por Color", expanded=False):
+        with st.expander("➕ Agregar Producto", expanded=False):
             inv_nombre = st.text_input("NOMBRE DE LA PRENDA", key="input_nombre_prenda_color_img")
             st.markdown("---")
-            st.markdown("🎨 **Añadir Color, Tono y su Imagen Correspondiente**")
+            st.markdown("🎨 **Añadir Color e Imagen**")
             
             col_picker, col_text = st.columns([1, 2])
             with col_picker:
                 color_picker_val = st.color_picker("Tono", "#3b82f6", key="picker_color_hex_v2")
             with col_text:
-                nuevo_color = st.text_input("NOMBRE O CÓDIGO DEL COLOR", value=color_picker_val, key="input_nuevo_color_nombre_v2")
+                nuevo_color = st.text_input("NOMBRE DEL COLOR", value=color_picker_val, key="input_nuevo_color_nombre_v2")
             
-            foto_color = st.file_uploader(f"🖼️ Subir Imagen para el color: `{nuevo_color}`", type=["png", "jpg", "jpeg"], key=f"uploader_img_{nuevo_color}")
+            foto_color = st.file_uploader(f"🖼️ Imagen para `{nuevo_color}`", type=["png", "jpg", "jpeg"], key=f"uploader_img_{nuevo_color}")
             
-            if st.button("➕ Añadir este Color al Producto"):
+            if st.button("➕ Añadir Color"):
                 if nuevo_color.strip():
                     c_clean = nuevo_color.strip()
                     if c_clean not in st.session_state["colores_inventario_avanzado"]:
@@ -365,28 +375,28 @@ with tabs[2]:
                             "imagen_file": foto_color,
                             "hex": color_picker_val if color_picker_val.startswith("#") else "#3b82f6"
                         }
-                        st.success(f"Color '{c_clean}' agregado con éxito.")
+                        st.success(f"Color '{c_clean}' agregado.")
                         st.rerun()
                     else:
-                        st.warning("Este color ya está en la lista.")
+                        st.warning("El color ya existe.")
                 else:
-                    st.error("Ingresa un nombre o código de color válido.")
+                    st.error("Ingresa un nombre de color válido.")
 
             if st.session_state["colores_inventario_avanzado"]:
-                st.markdown("#### 🔍 Configurar Existencias y Tallas por Color:")
-                color_activo = st.selectbox("Selecciona color a configurar:", list(st.session_state["colores_inventario_avanzado"].keys()), key="select_color_activo_v2")
+                st.markdown("#### 🔍 Existencias por Color:")
+                color_activo = st.selectbox("Color a configurar:", list(st.session_state["colores_inventario_avanzado"].keys()), key="select_color_activo_v2")
                 
                 if color_activo:
                     st.markdown(f"📏 **Tallas para `{color_activo}`**")
-                    cols_grid = st.columns(3)
+                    cols_grid = st.columns(2)
                     for idx, talla in enumerate(tallas_disponibles):
-                        col_actual = cols_grid[idx % 3]
+                        col_actual = cols_grid[idx % 2]
                         with col_actual:
                             val_actual = st.session_state["colores_inventario_avanzado"][color_activo]["tallas"].get(talla, 0)
                             nueva_cant = st.number_input(f"Talla {talla}", min_value=0, step=1, value=int(val_actual), key=f"cant_v2_{color_activo}_{talla}")
                             st.session_state["colores_inventario_avanzado"][color_activo]["tallas"][talla] = int(nueva_cant)
                             
-                    if st.button("🗑️ Eliminar este color", key=f"del_col_v2_{color_activo}"):
+                    if st.button("🗑️ Eliminar color", key=f"del_col_v2_{color_activo}"):
                         del st.session_state["colores_inventario_avanzado"][color_activo]
                         st.rerun()
 
@@ -395,7 +405,7 @@ with tabs[2]:
                 if not inv_nombre.strip():
                     st.error("⚠️ Debes ingresar el nombre del producto.")
                 elif not st.session_state["colores_inventario_avanzado"]:
-                    st.error("⚠️ Debes agregar al menos un color con sus tallas e imágenes.")
+                    st.error("⚠️ Agrega al menos un color con sus tallas.")
                 else:
                     try:
                         data_a_guardar = {}
@@ -418,10 +428,10 @@ with tabs[2]:
                         }).execute()
                         
                         st.session_state["colores_inventario_avanzado"] = {}
-                        st.success("✅ ¡Producto guardado con éxito!")
+                        st.success("✅ ¡Producto guardado!")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Error al guardar producto: {e}")
+                        st.error(f"Error al guardar: {e}")
         st.divider()
 
     @st.fragment
@@ -431,7 +441,7 @@ with tabs[2]:
             inventario_db = response.data
             
             if inventario_db:
-                st.markdown("### 📋 Existencias Actuales en Almacén")
+                st.markdown("### 📋 Existencias Actuales")
                 for item in inventario_db:
                     item_id = item.get("id")
                     p_nombre = item.get("nombre_producto", "Sin nombre")
@@ -451,100 +461,77 @@ with tabs[2]:
                                             "hex": "#3b82f6"
                                         }
                                     }
-                                    supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
                                 else:
                                     dict_colores = temp_data
                     except Exception:
                         dict_colores = {}
 
-                    st.markdown(f"### 🏷️ {p_nombre}")
+                    st.markdown(f"#### 🏷️ {p_nombre}")
                     
                     if dict_colores:
                         lista_cols = list(dict_colores.keys())
-                        key_activo = f"color_activo_prod_{item_id}_{trigger_val}"
                         
-                        if key_activo not in st.session_state or st.session_state[key_activo] not in lista_cols:
-                            st.session_state[key_activo] = lista_cols[0]
+                        # Selector compacto horizontal en lugar de lista apilada de botones
+                        color_sel = st.radio(
+                            "Selecciona Color:",
+                            options=lista_cols,
+                            key=f"radio_color_{item_id}_{trigger_val}",
+                            horizontal=True
+                        )
                         
-                        st.markdown("Colores")
-                        cols_colores = st.columns(min(len(lista_cols), 4))
-                        for idx, c_name in enumerate(lista_cols):
-                            with cols_colores[idx % len(cols_colores)]:
-                                if st.button(c_name, key=f"btn_color_item_{item_id}_{c_name}_{trigger_val}", use_container_width=True):
-                                    st.session_state[key_activo] = c_name
-                                    st.rerun()
-                        
-                        color_sel = st.session_state[key_activo]
                         data_color = dict_colores.get(color_sel, {})
                         
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        col_img, col_info = st.columns([1, 2])
+                        col_img, col_info = st.columns([1, 1])
                         
                         with col_img:
                             if data_color.get("imagen_url"): 
                                 st.image(data_color["imagen_url"], use_container_width=True)
                             else:
-                                st.info("Sin imagen para este color")
+                                st.caption("📷 Sin imagen")
                                 
                         with col_info:
-                            st.markdown(f"**Existencias para el color: `{color_sel}`**")
+                            st.markdown(f"**Tallas (`{color_sel}`):**")
                             tallas_del_color = data_color.get("tallas", {})
                             
-                            columna_1 = ["2", "4", "6", "8", "10"]
-                            columna_2 = ["12", "14", "16", "S", "M"]
-                            columna_3 = ["WS", "WM", "L", "XL", "2XL"]
-                            
-                            grid_cols = st.columns(3)
-                            grupos_tallas = [columna_1, columna_2, columna_3]
-                            
-                            for col_idx, grupo in enumerate(grupos_tallas):
-                                with grid_cols[col_idx]:
-                                    for talla in grupo:
-                                        cantidad = int(tallas_del_color.get(talla, 0))
-                                        if puede_modificar:
-                                            sub1, sub2, sub3 = st.columns([1.2, 2.0, 0.8])
-                                            with sub1:
-                                                st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='font-size: 0.85em; font-weight: bold; color: #4ade80;'>{talla}</span></div>", unsafe_allow_html=True)
-                                            with sub2:
-                                                nueva_cant = st.number_input(f"Talla {talla}", min_value=0, step=1, value=cantidad, key=f"num_{item_id}_{color_sel}_{talla}_{trigger_val}", label_visibility="collapsed")
-                                            with sub3:
-                                                if st.button("💾", key=f"save_{item_id}_{color_sel}_{talla}_{trigger_val}", help=f"Guardar Talla {talla}"):
-                                                    if nueva_cant != cantidad:
-                                                        dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
-                                                        supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                                                        st.success("¡Guardado!")
-                                                        st.rerun()
-                                        else:
-                                            st.markdown(f"<div style='background-color: #111827; padding: 6px; border-radius: 4px; border: 1px solid #1f2937; text-align: center;'><span style='color: #4ade80;'>{talla}</span>: <b>{cantidad:02d}</b></div>", unsafe_allow_html=True)
-                                        st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)
-                    else:
-                        st.warning("⚠️ Formato de colores estructurado no válido.")
+                            cols_tallas = st.columns(2)
+                            for idx, talla in enumerate(tallas_disponibles):
+                                col_curr = cols_tallas[idx % 2]
+                                cantidad = int(tallas_del_color.get(talla, 0))
+                                
+                                with col_curr:
+                                    if puede_modificar:
+                                        nueva_cant = st.number_input(
+                                            f"Talla {talla}", 
+                                            min_value=0, 
+                                            step=1, 
+                                            value=cantidad, 
+                                            key=f"num_{item_id}_{color_sel}_{talla}_{trigger_val}"
+                                        )
+                                        if nueva_cant != cantidad:
+                                            dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
+                                            supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                    else:
+                                        st.markdown(f"**{talla}:** `{cantidad:02d}`")
 
                     if puede_modificar:
-                        with st.expander(f"🛠️ Gestionar Colores e Imagen de: {p_nombre}"):
-                            nueva_img_file = st.file_uploader(f"Nueva imagen para `{color_sel}`", type=["png", "jpg", "jpeg"], key=f"up_img_prod_{item_id}_{color_sel}_{trigger_val}")
-                            if st.button("💾 Guardar Nueva Imagen", key=f"btn_save_img_{item_id}_{color_sel}_{trigger_val}"):
-                                if nueva_img_file is not None:
-                                    try:
-                                        url_subida = subir_a_supabase(nueva_img_file.getvalue(), nueva_img_file.name)
-                                        dict_colores[color_sel]["imagen_url"] = url_subida
-                                        supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                                        st.success("✅ ¡Imagen actualizada!")
-                                        st.rerun()
-                                    except Exception as e:
-                                        st.error(f"Error: {e}")
-                                else:
-                                    st.warning("Selecciona una imagen primero.")
-                            
-                            if st.button("🗑️ Eliminar Producto Completo", key=f"del_prod_item_{item_id}_{trigger_val}"):
+                        with st.expander(f"⚙️ Ajustes de {p_nombre}"):
+                            nueva_img_file = st.file_uploader(f"Nueva imagen ({color_sel})", type=["png", "jpg", "jpeg"], key=f"up_img_{item_id}_{color_sel}_{trigger_val}")
+                            if st.button("💾 Actualizar Imagen", key=f"btn_img_{item_id}_{color_sel}_{trigger_val}"):
+                                if nueva_img_file:
+                                    url_subida = subir_a_supabase(nueva_img_file.getvalue(), nueva_img_file.name)
+                                    dict_colores[color_sel]["imagen_url"] = url_subida
+                                    supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                    st.success("¡Imagen actualizada!")
+                                    st.rerun()
+                                    
+                            if st.button("🗑️ Eliminar Producto", key=f"del_prod_{item_id}_{trigger_val}"):
                                 supabase.table("almacen").delete().eq("id", item_id).execute()
-                                st.warning("⚠️ Producto eliminado.")
                                 st.rerun()
                     st.divider()
             else:
-                st.info("No hay productos registrados en el almacén.")
+                st.info("No hay productos en almacén.")
         except Exception as e:
-            st.error(f"Error al cargar almacén: {e}")
+            st.error(f"Error al cargar inventario: {e}")
 
     render_inventario_fresco(st.session_state["sync_trigger"])
 
@@ -564,15 +551,15 @@ with tabs[3]:
                             "password": nuevo_pass,
                             "rol_id": nuevo_rol
                         }).execute()
-                        st.success("✅ Usuario creado exitosamente.")
+                        st.success("✅ Usuario creado.")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Error al crear usuario: {e}")
+                        st.error(f"Error: {e}")
                 else:
-                    st.warning("Completa todos los campos.")
+                    st.warning("Completa los campos.")
         
         st.markdown("---")
-        st.subheader("Lista de Usuarios Registrados")
+        st.subheader("Usuarios Registrados")
         try:
             usuarios_db = supabase.table("usuarios").select("*").execute().data
             if usuarios_db:
@@ -582,17 +569,15 @@ with tabs[3]:
                     u_pass = u.get('password')
                     u_rol = u.get('rol_id')
 
-                    col_u1, col_u2, col_u3, col_u4 = st.columns([2, 2, 1, 1])
+                    col_u1, col_u2, col_u3 = st.columns([2, 1, 1])
                     with col_u1:
-                        st.text(f"👤 {u_nombre}")
+                        st.markdown(f"👤 **{u_nombre}** ({u_rol})")
                     with col_u2:
-                        st.text(f"Rol: {u_rol}")
-                    with col_u3:
                         btn_editar = st.button("✏️ Modificar", key=f"btn_edit_user_{u_id}")
-                    with col_u4:
+                    with col_u3:
                         if st.button("🗑️ Eliminar", key=f"del_user_{u_id}"):
                             supabase.table("usuarios").delete().eq("id", u_id).execute()
-                            st.success("Usuario eliminado")
+                            st.success("Eliminado")
                             st.rerun()
 
                     if f"edit_mode_{u_id}" not in st.session_state:
@@ -604,16 +589,16 @@ with tabs[3]:
 
                     if st.session_state.get(f"edit_mode_{u_id}", False):
                         with st.form(key=f"form_mod_user_{u_id}"):
-                            st.markdown(f"**Modificando a: {u_nombre}**")
-                            mod_nombre = st.text_input("Nuevo Nombre de Usuario", value=u_nombre, key=f"mod_n_{u_id}")
-                            mod_pass = st.text_input("Nueva Contraseña", value=u_pass, type="password", key=f"mod_p_{u_id}")
+                            st.markdown(f"**Editar: {u_nombre}**")
+                            mod_nombre = st.text_input("Usuario", value=u_nombre, key=f"mod_n_{u_id}")
+                            mod_pass = st.text_input("Contraseña", value=u_pass, type="password", key=f"mod_p_{u_id}")
                             
                             idx_rol_actual = roles_disponibles.index(u_rol) if u_rol in roles_disponibles else 0
-                            mod_rol = st.selectbox("Nuevo Rol Asignado", roles_disponibles, index=idx_rol_actual, key=f"mod_r_{u_id}")
+                            mod_rol = st.selectbox("Rol", roles_disponibles, index=idx_rol_actual, key=f"mod_r_{u_id}")
                             
                             col_sub1, col_sub2 = st.columns(2)
                             with col_sub1:
-                                guardar_cambios = st.form_submit_button("💾 Guardar Cambios")
+                                guardar_cambios = st.form_submit_button("💾 Guardar")
                             with col_sub2:
                                 cancelar_cambios = st.form_submit_button("❌ Cancelar")
 
@@ -626,18 +611,16 @@ with tabs[3]:
                                             "rol_id": mod_rol
                                         }).eq("id", u_id).execute()
                                         st.session_state[f"edit_mode_{u_id}"] = False
-                                        st.success("✅ Usuario actualizado correctamente.")
+                                        st.success("✅ Actualizado.")
                                         st.rerun()
                                     except Exception as e:
-                                        st.error(f"Error al actualizar: {e}")
-                                else:
-                                    st.warning("Completa los campos obligatorios.")
+                                        st.error(f"Error: {e}")
 
                             if cancelar_cambios:
                                 st.session_state[f"edit_mode_{u_id}"] = False
                                 st.rerun()
                     st.divider()
             else:
-                st.info("No hay usuarios adicionales registrados.")
+                st.info("Sin usuarios registrados.")
         except Exception as e:
             st.error(f"Error al cargar usuarios: {e}")

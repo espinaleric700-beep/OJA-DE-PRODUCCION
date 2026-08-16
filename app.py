@@ -205,7 +205,6 @@ lista_estados = [
 
 tallas_disponibles = ["2", "4", "6", "8", "10", "12", "14", "16", "S", "M", "WS", "WM", "L", "XL", "2XL"]
 
-# Extensiones de archivos permitidas para diseños y documentos de orden
 FORMATOS_ORDEN = [
     "png", "jpg", "jpeg", "pdf", "emb", "dst", "ai", 
     "psd", "eps", "svg", "cdr", "zip", "rar", "7z", "txt", "docx"
@@ -386,7 +385,7 @@ with tabs[0]:
                                 st.write(f"**Abono:** ${o.get('abono', 0)}")
                                 st.write(f"**Restante:** ${o.get('restante', 0)}")
                         
-                        # Visualización de Archivos Adjuntos a la Orden
+                        # Visualización de Archivos Adjuntos
                         st.markdown("📎 **Archivos Adjuntos:**")
                         try:
                             lista_archivos = json.loads(archivos_db) if isinstance(archivos_db, str) else archivos_db
@@ -409,6 +408,35 @@ with tabs[0]:
                                 for reg in registros[:5]:
                                     st.caption(f"🕒 {reg.get('fecha', '-')} | 👤 {reg.get('usuario', '-')}: {reg.get('de', '')} ➡️ {reg.get('a', '')}")
                         except: st.caption("Sin historial.")
+
+                        # ======================================================
+                        # OPCIÓN SOLO PARA ADMIN: ELIMINAR ORDEN
+                        # ======================================================
+                        if st.session_state['rol'] == "Administrador":
+                            st.markdown("---")
+                            confirm_key = f"confirm_del_orden_{o_id}"
+                            
+                            if not st.session_state.get(confirm_key, False):
+                                if st.button(f"🗑️ Eliminar Orden #{numero_o}", key=f"btn_init_del_orden_{o_id}"):
+                                    st.session_state[confirm_key] = True
+                                    st.rerun()
+                            else:
+                                st.warning(f"⚠️ ¿Seguro que deseas eliminar permanentemente la Orden #{numero_o}?")
+                                col_del_yes, col_del_no = st.columns(2)
+                                with col_del_yes:
+                                    if st.button("✅ Sí, Eliminar", key=f"btn_confirm_del_yes_{o_id}"):
+                                        try:
+                                            supabase.table("ordenes").delete().eq("id", o_id).execute()
+                                            st.session_state[confirm_key] = False
+                                            st.success(f"Orden #{numero_o} eliminada exitosamente.")
+                                            st.rerun()
+                                        except Exception as err:
+                                            st.error(f"Error al eliminar la orden: {err}")
+                                with col_del_no:
+                                    if st.button("❌ Cancelar", key=f"btn_confirm_del_no_{o_id}"):
+                                        st.session_state[confirm_key] = False
+                                        st.rerun()
+
         else: st.info("No hay órdenes encontradas.")
     except Exception as e: st.error(f"Error: {e}")
 
@@ -431,7 +459,6 @@ with tabs[1]:
         total_orden = st.number_input("Total ($)", min_value=0.0, step=100.0)
         abono_orden = st.number_input("Abono / Anticipo ($)", min_value=0.0, step=100.0)
         
-        # Subida múltiple de archivos de diferentes formatos
         archivos_subidos = st.file_uploader(
             "📁 Adjuntar Archivos (Múltiples formatos: PNG, JPG, PDF, EMB, DST, AI, PSD, ZIP, etc.)", 
             type=FORMATOS_ORDEN, 
@@ -442,7 +469,6 @@ with tabs[1]:
         observaciones = st.text_area("Observaciones")
         
         if st.form_submit_button("💾 Guardar Orden"):
-            # Procesar y subir múltiples archivos
             urls_archivos = []
             if archivos_subidos:
                 with st.spinner("Subiendo archivos..."):

@@ -63,7 +63,6 @@ components.html(
 
 st.markdown("""
     <style>
-    /* Estilos Generales Dark Theme */
     .stApp { 
         background-color: #0b0e14;
         background-image: 
@@ -432,7 +431,6 @@ with tabs[0]:
                         try:
                             lista_tallas = json.loads(tallas_db) if isinstance(tallas_db, str) else tallas_db
                             
-                            # Botón de activación para editar tallas manualmente
                             edit_mode_key = f"edit_tallas_mode_{o_id}"
                             if edit_mode_key not in st.session_state:
                                 st.session_state[edit_mode_key] = False
@@ -444,33 +442,54 @@ with tabs[0]:
 
                             if st.session_state[edit_mode_key]:
                                 st.info("Modo de edición manual activo:")
-                                nuevo_detalle_tallas = []
-                                with st.form(key=f"form_edit_tallas_{o_id}"):
-                                    # Asegurarnos de tener una estructura base editable con las tallas disponibles o las existentes
-                                    tallas_existentes_map = {item.get("talla"): item for item in (lista_tallas if isinstance(lista_tallas, list) else [])}
+                                
+                                tallas_existentes_map = {}
+                                if isinstance(lista_tallas, list):
+                                    for item in lista_tallas:
+                                        if isinstance(item, dict) and "talla" in item:
+                                            tallas_existentes_map[item["talla"]] = item
+
+                                default_seleccion = list(tallas_existentes_map.keys())
+                                if not default_seleccion and tallas_disponibles:
+                                    default_seleccion = [tallas_disponibles[0]]
+
+                                tallas_a_editar = st.multiselect(
+                                    "Seleccionar Tallas", 
+                                    options=tallas_disponibles, 
+                                    default=default_seleccion, 
+                                    key=f"ms_edit_{o_id}"
+                                )
+                                
+                                temp_tallas_actualizadas = []
+                                for sz in tallas_a_editar:
+                                    datos_previos = tallas_existentes_map.get(sz, {"cantidad": 1, "comentario": ""})
+                                    c_col1, c_col2 = st.columns([1, 2])
+                                    with c_col1:
+                                        cant_val = st.number_input(
+                                            f"Cantidad {sz}", 
+                                            min_value=0, 
+                                            value=int(datos_previos.get("cantidad", 1)), 
+                                            step=1, 
+                                            key=f"edit_cant_{o_id}_{sz}"
+                                        )
+                                    with c_col2:
+                                        obs_val = st.text_input(
+                                            f"Comentario {sz}", 
+                                            value=str(datos_previos.get("comentario", "")), 
+                                            key=f"edit_obs_{o_id}_{sz}"
+                                        )
                                     
-                                    tallas_a_editar = st.multiselect("Seleccionar Tallas", options=tallas_disponibles, default=list(tallas_existentes_map.keys()), key=f"ms_edit_{o_id}")
-                                    
-                                    temp_tallas_actualizadas = []
-                                    for sz in tallas_a_editar:
-                                        datos_previos = tallas_existentes_map.get(sz, {"cantidad": 1, "comentario": ""})
-                                        c_col1, c_col2 = st.columns([1, 2])
-                                        with c_col1:
-                                            cant_val = st.number_input(f"Cantidad {sz}", min_value=0, value=int(datos_previos.get("cantidad", 1)), step=1, key=f"edit_cant_{o_id}_{sz}")
-                                        with c_col2:
-                                            obs_val = st.text_input(f"Comentario {sz}", value=str(datos_previos.get("comentario", "")), key=f"edit_obs_{o_id}_{sz}")
-                                        
-                                        temp_tallas_actualizadas.append({
-                                            "talla": sz,
-                                            "cantidad": int(cant_val),
-                                            "comentario": obs_val.strip()
-                                        })
-                                    
-                                    if st.form_submit_button("💾 Guardar Cambios de Tallas"):
-                                        supabase.table("ordenes").update({"tallas_detalle": json.dumps(temp_tallas_actualizadas)}).eq("id", o_id).execute()
-                                        st.session_state[edit_mode_key] = False
-                                        st.success("¡Tallas actualizadas correctamente!")
-                                        st.rerun()
+                                    temp_tallas_actualizadas.append({
+                                        "talla": sz,
+                                        "cantidad": int(cant_val),
+                                        "comentario": obs_val.strip()
+                                    })
+                                
+                                if st.button("💾 Guardar Cambios de Tallas", key=f"btn_save_tallas_direct_{o_id}"):
+                                    supabase.table("ordenes").update({"tallas_detalle": json.dumps(temp_tallas_actualizadas)}).eq("id", o_id).execute()
+                                    st.session_state[edit_mode_key] = False
+                                    st.success("¡Tallas actualizadas correctamente!")
+                                    st.rerun()
                             else:
                                 if lista_tallas and len(lista_tallas) > 0:
                                     rows_html = ""
@@ -761,7 +780,6 @@ with tabs[2]:
                                 info_color = p_datos[color_seleccionado_ver]
                                 tallas_dict = info_color.get("tallas", {})
                                 
-                                # Renderizar tabla de inventario grid
                                 filas_grid = f"""
                                 <table class="inventory-grid-table">
                                     <tr>

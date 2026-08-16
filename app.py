@@ -308,6 +308,8 @@ def obtener_badge_estado(estado):
 if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 if "colores_inventario_avanzado" not in st.session_state: st.session_state["colores_inventario_avanzado"] = {}
 if "sync_trigger" not in st.session_state: st.session_state["sync_trigger"] = 0
+if "nueva_orden_tallas_dinamicas" not in st.session_state: 
+    st.session_state["nueva_orden_tallas_dinamicas"] = [{"talla": "S", "cantidad": 1, "comentario": ""}]
 
 count = st_autorefresh(interval=10000, key="datasync_counter")
 
@@ -518,7 +520,6 @@ with tabs[0]:
                                     url_f = item_file.get("url", "") if isinstance(item_file, dict) else item_file
                                     nom_f = item_file.get("nombre", f"Archivo {idx_arch+1}") if isinstance(item_file, dict) else f"Archivo {idx_arch+1}"
                                     if url_f:
-                                        # Verificamos si es una imagen para mostrar miniatura
                                         ext_archivo = nom_f.lower().split('.')[-1] if '.' in nom_f else ""
                                         if ext_archivo in ["png", "jpg", "jpeg", "webp", "gif"]:
                                             col_thumb, col_link = st.columns([1, 4])
@@ -577,6 +578,44 @@ with tabs[1]:
     st.subheader("➕ Crear Nueva Orden")
     numero_auto = obtener_siguiente_numero_orden()
     
+    # Botones fuera del form para agregar o limpiar tallas dinámicamente
+    st.markdown("👕 **Selección e Información de Tallas / Sizes**")
+    col_add_btn, col_clear_btn = st.columns([2, 1])
+    with col_add_btn:
+        if st.button("➕ Agregar Talla", key="btn_add_talla_fila"):
+            st.session_state["nueva_orden_tallas_dinamicas"].append({"talla": "S", "cantidad": 1, "comentario": ""})
+            st.rerun()
+    with col_clear_btn:
+        if st.button("🗑️ Limpiar Tallas", key="btn_clear_tallas_fila"):
+            st.session_state["nueva_orden_tallas_dinamicas"] = []
+            st.rerun()
+
+    dict_detalle_tallas = []
+    if st.session_state["nueva_orden_tallas_dinamicas"]:
+        for idx, item_talla in enumerate(st.session_state["nueva_orden_tallas_dinamicas"]):
+            cols_fila = st.columns([1.5, 1, 2.5, 0.5])
+            with cols_fila[0]:
+                talla_sel = st.selectbox(f"Talla #{idx+1}", options=tallas_disponibles, index=tallas_disponibles.index(item_talla["talla"]) if item_talla["talla"] in tallas_disponibles else 0, key=f"dinamica_talla_{idx}")
+            with cols_fila[1]:
+                cant_val = st.number_input(f"Cant #{idx+1}", min_value=1, value=int(item_talla["cantidad"]), step=1, key=f"dinamica_cant_{idx}")
+            with cols_fila[2]:
+                obs_val = st.text_input(f"Detalle #{idx+1}", value=item_talla["comentario"], placeholder="Ej: Nombre Juan #10...", key=f"dinamica_obs_{idx}")
+            with cols_fila[3]:
+                st.write("") 
+                st.write("")
+                if st.button("❌", key=f"dinamica_del_{idx}"):
+                    st.session_state["nueva_orden_tallas_dinamicas"].pop(idx)
+                    st.rerun()
+            
+            dict_detalle_tallas.append({
+                "talla": talla_sel,
+                "cantidad": int(cant_val),
+                "comentario": obs_val.strip()
+            })
+    else:
+        st.info("Haz clic en '➕ Agregar Talla' para añadir tallas a esta orden.")
+
+    st.markdown("---")
     with st.form("form_crear_orden_completa"):
         col_c1, col_c2 = st.columns(2)
         with col_c1:
@@ -594,29 +633,6 @@ with tabs[1]:
             abono_orden = st.number_input("ABONO / ANTICIPO ($)", min_value=0.0, step=100.0)
         
         st.markdown("---")
-        st.markdown("👕 **Selección e Información de Tallas / Sizes**")
-        tallas_seleccionadas = st.multiselect(
-            "Selecciona las Tallas / Sizes que llevará esta orden:",
-            options=tallas_disponibles,
-            placeholder="Elige una o más tallas..."
-        )
-        
-        dict_detalle_tallas = []
-        if tallas_seleccionadas:
-            st.caption("Especifique la cantidad y detalles/comentarios para cada talla seleccionada:")
-            for sz in tallas_seleccionadas:
-                c_cant, c_obs = st.columns([1, 2.5])
-                with c_cant:
-                    cant_sz = st.number_input(f"Cantidad Size {sz}", min_value=1, value=1, step=1, key=f"form_cant_sz_{sz}")
-                with c_obs:
-                    obs_sz = st.text_input(f"Comentario/Detalles Size {sz}", placeholder="Ej: Nombre Juan #10, manga corta...", key=f"form_obs_sz_{sz}")
-                dict_detalle_tallas.append({
-                    "talla": sz,
-                    "cantidad": int(cant_sz),
-                    "comentario": obs_sz.strip()
-                })
-        
-        st.markdown("---")
         archivos_subidos = st.file_uploader(
             "📁 Adjuntar Archivos (Múltiples formatos: PNG, JPG, PDF, EMB, DST, AI, PSD, ZIP, etc.)", 
             type=FORMATOS_ORDEN, 
@@ -627,40 +643,46 @@ with tabs[1]:
         observaciones = st.text_area("Observaciones Generales")
         
         if st.form_submit_button("💾 Guardar Orden"):
-            try:
-                urls_archivos = []
-                if archivos_subidos:
-                    with st.spinner("Subiendo archivos..."):
-                        for arch in archivos_subidos:
-                            url_file = subir_a_supabase(arch.getvalue(), arch.name, bucket="disenos", carpeta="ordenes_archivos")
-                            urls_archivos.append({"nombre": arch.name, "url": url_file})
+            if not dict_detalle_tallas:
+                st.error("⚠️ Debes agregar al menos una talla a la orden.")
+            else:
+                try:
+                    urls_archivos = []
+                    if archivos_subidos:
+                        with st.spinner("Subiendo archivos..."):
+                            for arch in archivos_subidos:
+                                url_file = subir_a_supabase(arch.getvalue(), arch.name, bucket="disenos", carpeta="ordenes_archivos")
+                                urls_archivos.append({"nombre": arch.name, "url": url_file})
 
-                historial_inicial = json.dumps([{
-                    "usuario": st.session_state['usuario'], 
-                    "de": "Inicio", 
-                    "a": "Pendiente", 
-                    "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }])
-                
-                supabase.table("ordenes").insert({
-                    "nombre_orden": numero_auto,
-                    "nombre_cliente": nombre_cliente,
-                    "telefono": telefono_cliente,
-                    "tipo_servicio": tipo_servicio,
-                    "fecha_entrega": str(fecha_entrega),
-                    "total": total_orden,
-                    "abono": abono_orden,
-                    "restante": total_orden - abono_orden,
-                    "observaciones": observaciones,
-                    "tallas_detalle": json.dumps(dict_detalle_tallas),
-                    "archivos": json.dumps(urls_archivos),
-                    "estado_actual": "Pendiente",
-                    "historial": historial_inicial
-                }).execute()
-                st.success("¡Orden creada correctamente!")
-                st.rerun()
-            except Exception as err:
-                st.error(f"❌ Error al guardar la orden en Supabase: {err}")
+                    historial_inicial = json.dumps([{
+                        "usuario": st.session_state['usuario'], 
+                        "de": "Inicio", 
+                        "a": "Pendiente", 
+                        "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }])
+                    
+                    supabase.table("ordenes").insert({
+                        "nombre_orden": numero_auto,
+                        "nombre_cliente": nombre_cliente,
+                        "telefono": telefono_cliente,
+                        "tipo_servicio": tipo_servicio,
+                        "fecha_entrega": str(fecha_entrega),
+                        "total": total_orden,
+                        "abono": abono_orden,
+                        "restante": total_orden - abono_orden,
+                        "observaciones": observaciones,
+                        "tallas_detalle": json.dumps(dict_detalle_tallas),
+                        "archivos": json.dumps(urls_archivos),
+                        "estado_actual": "Pendiente",
+                        "historial": historial_inicial
+                    }).execute()
+                    
+                    # Limpiar las tallas dinámicas para la próxima orden
+                    st.session_state["nueva_orden_tallas_dinamicas"] = [{"talla": "S", "cantidad": 1, "comentario": ""}]
+                    st.success("¡Orden creada correctamente!")
+                    st.rerun()
+                except Exception as err:
+                    st.error(f"❌ Error al guardar la orden en Supabase: {err}")
 
 # ==============================================================================
 # TAB 3: ALMACÉN

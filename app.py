@@ -588,7 +588,7 @@ with tabs[1]:
             st.rerun()
 
 # ==============================================================================
-# TAB 3: ALMACÉN (REORGANIZADO: IMAGEN A LA DERECHA Y TALLAS MÁS PEQUEÑAS)
+# TAB 3: ALMACÉN (VERSIÓN ANTERIOR: IMAGEN ARRIBA / DISEÑO ORIGINAL)
 # ==============================================================================
 with tabs[2]:
     st.subheader("📦 Control de Inventario")
@@ -630,7 +630,6 @@ with tabs[2]:
                 
                 if color_activo:
                     st.markdown(f"📏 **Tallas para `{color_activo}`**")
-                    # Se utiliza una estructura más compacta para las entradas de stock por talla
                     cols_grid = st.columns(3 if es_movil else 6)
                     num_cols = len(cols_grid)
                     for idx, talla in enumerate(tallas_disponibles):
@@ -678,7 +677,7 @@ with tabs[2]:
                         st.error(f"Error al guardar el inventario: {e}")
 
     # ==========================================================================
-    # SECCIÓN DE VISUALIZACIÓN DE INVENTARIO (IMAGEN A LA DERECHA, TALLAS COMPACTAS)
+    # SECCIÓN DE VISUALIZACIÓN DE INVENTARIO (DISEÑO ORIGINAL: IMAGEN ARRIBA)
     # ==========================================================================
     st.markdown("### 📊 Existencias Actuales")
     try:
@@ -712,39 +711,24 @@ with tabs[2]:
                             img_url_prod = info_color.get("imagen_url", "")
                             
                             st.markdown("---")
-                            # REORGANIZACIÓN: Información de tallas a la izquierda, Imagen a la derecha
-                            col_tallas_izq, col_img_der = st.columns([2.2, 1.2])
+                            # DISEÑO ORIGINAL: Imagen arriba y abajo las tallas
+                            if img_url_prod:
+                                st.image(img_url_prod, use_container_width=True)
                             
-                            with col_tallas_izq:
-                                st.markdown(f"📏 **Tallas Disponibles (`{color_seleccionado}`):**")
-                                
-                                # Grid más compacto para las tallas (6 columnas para optimizar espacio)
-                                cols_grid_tallas = st.columns(3 if es_movil else 6)
-                                num_g_cols = len(cols_grid_tallas)
-                                
-                                for t_idx, talla_item in enumerate(tallas_disponibles):
-                                    cant_stock = tallas_dict.get(talla_item, 0)
-                                    col_celda = cols_grid_tallas[t_idx % num_g_cols]
-                                    with col_celda:
-                                        # Mini tarjeta compacta para cada talla
-                                        st.markdown(
-                                            f"""
-                                            <div style="background: rgba(22, 27, 34, 0.9); border: 1px solid #30363d; border-radius: 6px; padding: 4px; text-align: center; margin-bottom: 6px;">
-                                                <div style="font-size: 0.70rem; color: #8b949e; font-weight: bold; text-transform: uppercase;">{talla_item}</div>
-                                                <div style="font-size: 1.05rem; color: #58a6ff; font-weight: bold;">{cant_stock}</div>
-                                            </div>
-                                            """, 
-                                            unsafe_allow_html=True
-                                        )
+                            st.markdown(f"📏 **Tallas Disponibles (`{color_seleccionado}`):**")
                             
-                            with col_img_der:
-                                if img_url_prod:
-                                    st.image(img_url_prod, use_container_width=True)
-                                else:
+                            cols_grid_tallas = st.columns(4 if es_movil else 8)
+                            num_g_cols = len(cols_grid_tallas)
+                            
+                            for t_idx, talla_item in enumerate(tallas_disponibles):
+                                cant_stock = tallas_dict.get(talla_item, 0)
+                                col_celda = cols_grid_tallas[t_idx % num_g_cols]
+                                with col_celda:
                                     st.markdown(
-                                        """
-                                        <div style="display: flex; align-items: center; justify-content: center; height: 160px; background: rgba(22, 27, 34, 0.4); border: 1px dashed #30363d; border-radius: 8px; color: #8b949e; font-size: 0.85rem;">
-                                            Sin imagen disponible
+                                        f"""
+                                        <div style="background: rgba(22, 27, 34, 0.9); border: 1px solid #30363d; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 6px;">
+                                            <div style="font-size: 0.75rem; color: #8b949e; font-weight: bold; text-transform: uppercase;">{talla_item}</div>
+                                            <div style="font-size: 1.15rem; color: #58a6ff; font-weight: bold;">{cant_stock}</div>
                                         </div>
                                         """, 
                                         unsafe_allow_html=True

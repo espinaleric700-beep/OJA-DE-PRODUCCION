@@ -63,29 +63,40 @@ components.html(
 
 st.markdown("""
     <style>
-    /* Estilos Generales Dark Theme */
-    .stApp { background-color: #0d1117; color: #e6edf3; }
+    /* Estilos Generales Dark Theme con Patrón de Rejilla/Lienzo */
+    .stApp { 
+        background-color: #0b0e14;
+        background-image: 
+            radial-gradient(circle at 50% 0%, rgba(88, 166, 255, 0.08) 0%, transparent 50%),
+            linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 100% 100%, 24px 24px, 24px 24px;
+        background-attachment: fixed;
+        color: #e6edf3; 
+    }
+    
     [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
     
     .user-card {
-        background-color: #161b22;
+        background-color: rgba(22, 27, 34, 0.85);
         border: 1px solid #30363d;
         border-radius: 8px;
         padding: 8px 12px;
         font-size: 0.85rem;
+        backdrop-filter: blur(4px);
     }
 
     .stButton > button {
         border-radius: 6px !important;
         font-weight: 600 !important;
-        background-color: #21262d !important;
+        background-color: #161b22 !important;
         color: #ffffff !important;
         border: 1px solid #363b42 !important;
         width: 100%;
         transition: all 0.2s ease;
     }
     .stButton > button:hover {
-        background-color: #30363d !important;
+        background-color: #21262d !important;
         color: #58a6ff !important;
         border-color: #58a6ff !important;
     }
@@ -103,7 +114,7 @@ st.markdown("""
 
     /* Estilos de inputs de Tallas */
     div[data-testid="stNumberInput"] {
-        background: #161b22;
+        background: rgba(22, 27, 34, 0.85);
         border: 1px solid #30363d;
         border-radius: 8px;
         padding: 4px 6px;
@@ -128,7 +139,7 @@ st.markdown("""
     div[data-testid="stRadio"] > div {
         gap: 8px !important;
         flex-wrap: wrap !important;
-        background: #161b22;
+        background: rgba(22, 27, 34, 0.85);
         padding: 8px 12px;
         border-radius: 8px;
         border: 1px solid #30363d;

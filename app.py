@@ -2,92 +2,67 @@ import streamlit as st
 import datetime
 
 # -----------------------------------------------------------------------------
-# Configuración de la página y Estilos CSS Personalizados (Modo Oscuro)
+# Configuración de la página
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Sistema de Ordenes - Pixel Thread",
-    page_icon="🧵",
+    page_title="Sistema de Ordenes",
     layout="wide"
 )
 
-# Estilos CSS personalizados para replicar el diseño oscuro y bordes de la imagen
+# Estilos visuales personalizados (Modo Oscuro como en la imagen)
 st.markdown("""
     <style>
-    /* Estilo del contenedor principal */
     .stApp {
-        background-color: #0e1117;
-        color: #ffffff;
+        background-color: #0d1117;
+        color: #e6edf3;
     }
-    
-    /* Personalización de inputs y contenedores */
-    div[data-baseweb="input"] {
-        background-color: #1a1d24 !important;
+    div[data-baseweb="input"], div[data-baseweb="select"] {
+        background-color: #161b22 !important;
+        border-color: #30363d !important;
         border-radius: 6px;
     }
-    
-    div[data-baseweb="select"] {
-        background-color: #1a1d24 !important;
-        border-radius: 6px;
-    }
-
-    /* Ajuste para tarjetas y formulario */
     .stForm {
-        border: 1px solid #262730;
-        border-radius: 10px;
-        padding: 20px;
-        background-color: #131720;
+        background-color: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 24px;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# Función para obtener el siguiente número de orden (Auto-incremental)
+# Estructura principal del formulario
 # -----------------------------------------------------------------------------
-def obtener_siguiente_numero_orden():
-    # En producción, puedes consultar tu base de datos (Ej. Supabase)
-    # SELECT count(*) FROM ordenes;
-    return "0000001"
+st.title("Gestión de Órdenes")
 
-# -----------------------------------------------------------------------------
-# Interfaz del Formulario
-# -----------------------------------------------------------------------------
-st.title("🧵 Registro de Nueva Orden")
-st.markdown("Ingrese los detalles del trabajo y del cliente a continuación.")
+with st.form(key="ordenes_form", clear_on_submit=False):
 
-with st.form(key="orden_form", clear_on_submit=False):
-    
-    # --- FILA 1: Número de Orden (Auto) y Tipo de Servicio ---
+    # FILA 1: Número de Orden (Auto) | Tipo de Servicio
     col1, col2 = st.columns(2)
     with col1:
         numero_orden = st.text_input(
             "Número de Orden (Auto)", 
-            value=obtener_siguiente_numero_orden(), 
+            value="0000001", 
             disabled=True
         )
     with col2:
         tipo_servicio = st.selectbox(
             "Tipo de Servicio", 
-            [
-                "Bordado", 
-                "Digitalización para Bordado 3D (Puff)", 
-                "Digitalización Plana", 
-                "Diseño de Logo", 
-                "Confección / Garment"
-            ]
+            ["Bordado", "Digitalización 3D", "Digitalización Plana", "Diseño", "Otro"]
         )
 
-    # --- FILA 2: Nombre / Título de la Orden ---
+    # FILA 2: Nombre de la Orden / Trabajo (NUEVO CAMPO)
     nombre_orden = st.text_input(
-        "Nombre de la Orden / Trabajo *", 
-        placeholder="Ej. Logo Pecho Gorra Flexfit / Bordado Camisa Corporativa"
+        "Nombre de la Orden / Trabajo", 
+        placeholder="Ej. Logo Pecho Gorra Flexfit / Bordado Camisa"
     )
 
-    # --- FILA 3: Datos del Cliente y Fecha ---
+    # FILA 3: Nombre del Cliente | Fecha Estimada de Entrega
     col3, col4 = st.columns(2)
     with col3:
         nombre_cliente = st.text_input(
-            "Nombre del Cliente *", 
-            placeholder="Ingrese el nombre del cliente o empresa"
+            "Nombre del Cliente", 
+            placeholder="Ingrese el nombre del cliente"
         )
     with col4:
         fecha_entrega = st.date_input(
@@ -95,19 +70,13 @@ with st.form(key="orden_form", clear_on_submit=False):
             value=datetime.date(2026, 8, 16)
         )
 
-    # --- FILA 4: Teléfono de Contacto ---
+    # FILA 4: Teléfono
     telefono = st.text_input(
         "Teléfono", 
-        placeholder="Ej. +1 809-XXX-XXXX"
+        placeholder=""
     )
 
-    # --- FILA 5: Archivo adjunto (Opcional - Logo / Arte) ---
-    archivo_logo = st.file_uploader(
-        "Adjuntar Archivo de Logo / Diseño (Opcional)", 
-        type=["png", "jpg", "jpeg", "pdf", "emb", "dst", "pxf", "glb"]
-    )
-
-    # --- FILA 6: Total y Abono ---
+    # FILA 5: TOTAL ($) | ABONO / ANTICIPO ($)
     col5, col6 = st.columns(2)
     with col5:
         total = st.number_input(
@@ -126,54 +95,30 @@ with st.form(key="orden_form", clear_on_submit=False):
             format="%.2f"
         )
 
-    # --- FILA 7: Cálculo del Saldo Pendiente ---
-    saldo_pendiente = total - abono
-    
-    st.markdown("---")
-    st.markdown(f"### **Saldo Pendiente:** `${saldo_pendiente:,.2f}`")
-
-    # Botón de Guardar
-    submit_button = st.form_submit_button(
-        label="Guardar Orden", 
-        use_container_width=True
-    )
+    # Botón invisible/submit estándar del formulario
+    submit_button = st.form_submit_button(label="Guardar Orden", use_container_width=True)
 
 # -----------------------------------------------------------------------------
-# Lógica al enviar el formulario
+# Lógica al procesar el formulario
 # -----------------------------------------------------------------------------
 if submit_button:
-    # Validaciones básicas de campos obligatorios
     if not nombre_orden.strip():
-        st.error("⚠️ El campo 'Nombre de la Orden' es obligatorio.")
+        st.error("Por favor, ingrese el Nombre de la Orden.")
     elif not nombre_cliente.strip():
-        st.error("⚠️ El campo 'Nombre del Cliente' es obligatorio.")
+        st.error("Por favor, ingrese el Nombre del Cliente.")
     else:
-        # Estructura del objeto listo para enviar a Supabase o Google Drive
-        orden_data = {
+        saldo_pendiente = total - abono
+        st.success(f"¡Orden '{nombre_orden}' para {nombre_cliente} guardada exitosamente!")
+        
+        # Objeto listo para insertar a Supabase / Base de Datos
+        datos_orden = {
             "numero_orden": numero_orden,
             "tipo_servicio": tipo_servicio,
             "nombre_orden": nombre_orden,
             "nombre_cliente": nombre_cliente,
             "fecha_entrega": str(fecha_entrega),
             "telefono": telefono,
-            "total": float(total),
-            "abono": float(abono),
-            "saldo_pendiente": float(saldo_pendiente),
-            "estado": "Pendiente",
-            "creado_el": str(datetime.datetime.now())
+            "total": total,
+            "abono": abono,
+            "saldo_pendiente": saldo_pendiente
         }
-
-        # Mensaje de éxito en la interfaz
-        st.success(f"✅ ¡Orden **#{numero_orden} - {nombre_orden}** guardada con éxito para **{nombre_cliente}**!")
-        
-        # Muestra un resumen de los datos guardados
-        st.json(orden_data)
-        
-        # AQUÍ VA TU CÓDIGO DE CONEXIÓN A BASE DE DATOS (Ejemplo Supabase / Google Drive):
-        # try:
-        #     response = supabase.table("ordenes").insert(orden_data).execute()
-        #     if archivo_logo:
-        #         # Lógica para subir el archivo a Google Drive o Supabase Storage
-        #         pass
-        # except Exception as e:
-        #     st.error(f"Error al guardar en la base de datos: {e}")

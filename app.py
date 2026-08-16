@@ -248,7 +248,7 @@ roles_disponibles = [
 
 lista_estados = [
     "Pendiente", "Recepción", "Diseño Gráfico", "Digitalización de Bordados",
-    "Producción - Bordados", "Producción - Impresión", 
+    "Preparar para imprimir", "Producción - Bordados", "Producción - Impresión", 
     "Producción - Transferencia Térmica", "Orden Detenida", "Orden Cancelada", "Orden Entregada"
 ]
 
@@ -304,6 +304,7 @@ def obtener_badge_estado(estado, tipo_servicio=""):
         "Recepción": ("#58a6ff", "rgba(88, 166, 255, 0.15)"),
         "Diseño Gráfico": ("#38bdf8", "rgba(56, 189, 248, 0.15)"),
         "Digitalización de Bordados": ("#f472b6", "rgba(244, 114, 182, 0.15)"),
+        "Preparar para imprimir": ("#2ee6d6", "rgba(46, 230, 214, 0.15)"),
         "Producción - Bordados": ("#bc8cff", "rgba(188, 140, 255, 0.15)"),
         "Producción - Impresión": ("#36a3f7", "rgba(54, 163, 247, 0.15)"),
         "Producción - Transferencia Térmica": ("#f0883e", "rgba(240, 136, 62, 0.15)"),
@@ -420,7 +421,6 @@ with tabs[0]:
                     col_res, col_act = st.columns([2.2, 1.8])
                     with col_res: 
                         st.markdown(f"### Orden #{numero_o} - **{cliente_o}**", unsafe_allow_html=True)
-                        # Etiqueta visual clara del área / estado actual incluyendo el tipo de servicio
                         st.markdown(obtener_badge_estado(estado_actual, tipo_serv_o), unsafe_allow_html=True)
                     
                     with col_act:
@@ -435,14 +435,12 @@ with tabs[0]:
                                     st.success("¡Actualizado!")
                                     st.rerun()
                     
-                    # Expandidor con estado persistente guardado en st.session_state para mantenerse abierto tras recargas
                     expander_key_state = f"exp_open_{o_id}"
                     if expander_key_state not in st.session_state:
                         st.session_state[expander_key_state] = False
 
                     with st.expander("📂 Ver detalles completos", expanded=st.session_state[expander_key_state]):
-                        st.session_state[expander_key_state] = True # Mantener abierto si el usuario interactúa
-                        # Botón para activar Edición Total de la Orden
+                        st.session_state[expander_key_state] = True
                         edit_order_mode_key = f"edit_order_full_mode_{o_id}"
                         if edit_order_mode_key not in st.session_state:
                             st.session_state[edit_order_mode_key] = False
@@ -908,7 +906,6 @@ with tabs[2]:
                     with col_p_info:
                         st.markdown(f"### {p_nombre}")
                         
-                        # Opción de edición total del producto en inventario
                         edit_prod_mode_key = f"edit_prod_mode_{p_id}"
                         if edit_prod_mode_key not in st.session_state:
                             st.session_state[edit_prod_mode_key] = False
@@ -1056,7 +1053,6 @@ with tabs[3]:
                                     except Exception as err:
                                         st.error(f"Error al eliminar usuario: {err}")
 
-                        # Botón para editar usuario de manera total
                         edit_user_mode_key = f"edit_user_mode_{u_id}"
                         if edit_user_mode_key not in st.session_state:
                             st.session_state[edit_user_mode_key] = False

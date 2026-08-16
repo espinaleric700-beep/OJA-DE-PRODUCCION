@@ -311,6 +311,9 @@ if "sync_trigger" not in st.session_state: st.session_state["sync_trigger"] = 0
 if "nueva_orden_tallas_dinamicas" not in st.session_state: 
     st.session_state["nueva_orden_tallas_dinamicas"] = [{"talla": "S", "cantidad": 1, "comentario": ""}]
 
+# Estados de control para el formulario de nueva orden
+if "form_reset_counter" not in st.session_state: st.session_state["form_reset_counter"] = 0
+
 count = st_autorefresh(interval=10000, key="datasync_counter")
 
 # ==============================================================================
@@ -576,34 +579,38 @@ with tabs[0]:
 # ==============================================================================
 with tabs[1]:
     st.subheader("➕ Crear Nueva Orden")
+    
+    # Clave dinámica para resetear los inputs del formulario al guardar con éxito
+    rc = st.session_state["form_reset_counter"]
+    
     numero_auto = obtener_siguiente_numero_orden()
     
     col_c1, col_c2 = st.columns(2)
     with col_c1:
-        nombre_orden_input = st.text_input("Nombre / Referencia de la Orden", value=numero_auto, placeholder="Ej: Camisetas Corporativas o 0000001")
-        nombre_cliente = st.text_input("Nombre del Cliente")
-        telefono_cliente = st.text_input("Teléfono")
+        nombre_orden_input = st.text_input("Nombre / Referencia de la Orden", value=numero_auto, key=f"input_nombre_orden_{rc}")
+        nombre_cliente = st.text_input("Nombre del Cliente", key=f"input_cliente_{rc}")
+        telefono_cliente = st.text_input("Teléfono", key=f"input_telefono_{rc}")
     with col_c2:
-        tipo_servicio = st.selectbox("Tipo de Servicio", ["Bordado", "DTF", "Sublimación", "Mixto"])
-        fecha_entrega = st.date_input("Fecha Estimada de Entrega")
+        tipo_servicio = st.selectbox("Tipo de Servicio", ["Bordado", "DTF", "Sublimación", "Mixto"], key=f"sel_servicio_{rc}")
+        fecha_entrega = st.date_input("Fecha Estimada de Entrega", key=f"date_entrega_{rc}")
     
     col_m1, col_m2 = st.columns(2)
     with col_m1:
-        total_orden = st.number_input("TOTAL ($)", min_value=0.0, step=100.0)
+        total_orden = st.number_input("TOTAL ($)", min_value=0.0, step=100.0, key=f"num_total_{rc}")
     with col_m2:
-        abono_orden = st.number_input("ABONO / ANTICIPO ($)", min_value=0.0, step=100.0)
+        abono_orden = st.number_input("ABONO / ANTICIPO ($)", min_value=0.0, step=100.0, key=f"num_abono_{rc}")
     
     st.markdown("---")
     archivos_subidos = st.file_uploader(
         "📁 Adjuntar Archivos (Múltiples formatos: PNG, JPG, PDF, EMB, DST, AI, PSD, ZIP, etc.)", 
         type=FORMATOS_ORDEN, 
         accept_multiple_files=True,
-        key="uploader_archivos_orden"
+        key=f"uploader_archivos_orden_{rc}"
     )
     
-    observaciones = st.text_area("Observaciones Generales")
+    observaciones = st.text_area("Observaciones Generales", key=f"area_obs_{rc}")
     
-    # Bloque de tallas dinámicas situado al final (lo último que se agrega antes de guardar)
+    # Bloque de tallas dinámicas situado al final
     st.markdown("---")
     st.markdown("👕 **Selección e Información de Tallas / Sizes**")
     col_add_btn, col_clear_btn = st.columns([2, 1])
@@ -621,15 +628,15 @@ with tabs[1]:
         for idx, item_talla in enumerate(st.session_state["nueva_orden_tallas_dinamicas"]):
             cols_fila = st.columns([1.5, 1, 2.5, 0.5])
             with cols_fila[0]:
-                talla_sel = st.selectbox(f"Talla #{idx+1}", options=tallas_disponibles, index=tallas_disponibles.index(item_talla["talla"]) if item_talla["talla"] in tallas_disponibles else 0, key=f"dinamica_talla_{idx}")
+                talla_sel = st.selectbox(f"Talla #{idx+1}", options=tallas_disponibles, index=tallas_disponibles.index(item_talla["talla"]) if item_talla["talla"] in tallas_disponibles else 0, key=f"dinamica_talla_{idx}_{rc}")
             with cols_fila[1]:
-                cant_val = st.number_input(f"Cant #{idx+1}", min_value=1, value=int(item_talla["cantidad"]), step=1, key=f"dinamica_cant_{idx}")
+                cant_val = st.number_input(f"Cant #{idx+1}", min_value=1, value=int(item_talla["cantidad"]), step=1, key=f"dinamica_cant_{idx}_{rc}")
             with cols_fila[2]:
-                obs_val = st.text_input(f"Detalle #{idx+1}", value=item_talla["comentario"], placeholder="Ej: Nombre Juan #10...", key=f"dinamica_obs_{idx}")
+                obs_val = st.text_input(f"Detalle #{idx+1}", value=item_talla["comentario"], placeholder="Ej: Nombre Juan #10...", key=f"dinamica_obs_{idx}_{rc}")
             with cols_fila[3]:
                 st.write("") 
                 st.write("")
-                if st.button("❌", key=f"dinamica_del_{idx}"):
+                if st.button("❌", key=f"dinamica_del_{idx}_{rc}"):
                     st.session_state["nueva_orden_tallas_dinamicas"].pop(idx)
                     st.rerun()
             
@@ -679,9 +686,11 @@ with tabs[1]:
                     "historial": historial_inicial
                 }).execute()
                 
-                # Limpiar las tallas dinámicas para la próxima orden
+                # Restablecer formulario por completo y mostrar aviso de éxito
                 st.session_state["nueva_orden_tallas_dinamicas"] = [{"talla": "S", "cantidad": 1, "comentario": ""}]
-                st.success("¡Orden creada correctamente!")
+                st.session_state["form_reset_counter"] += 1
+                st.success("✅ ¡La orden se guardó correctamente y el formulario ha quedado limpio!")
+                time.sleep(1)
                 st.rerun()
             except Exception as err:
                 st.error(f"❌ Error al guardar la orden en Supabase: {err}")

@@ -39,7 +39,7 @@ if "keep_alive_thread_started" not in st.session_state:
     ping_thread.start()
 
 # ==============================================================================
-# CONFIGURACIÓN Y ESTILOS CSS ADAPTATIVOS (PC VS MÓVIL)
+# CONFIGURACIÓN Y ESTILOS CSS ADAPTATIVOS
 # ==============================================================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
@@ -63,7 +63,7 @@ components.html(
 
 st.markdown("""
     <style>
-    /* Estilos Generales Dark Theme con Patrón de Rejilla/Lienzo */
+    /* Estilos Generales Dark Theme */
     .stApp { 
         background-color: #0b0e14;
         background-image: 
@@ -101,7 +101,17 @@ st.markdown("""
         border-color: #58a6ff !important;
     }
 
-    /* Imagen general con fondo transparente */
+    /* Estilos para las tarjetas contenedoras con borde */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: rgba(22, 27, 34, 0.75) !important;
+        border: 1px solid #30363d !important;
+        border-left: 4px solid #58a6ff !important;
+        border-radius: 10px !important;
+        padding: 16px !important;
+        margin-bottom: 12px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+    }
+
     [data-testid="stImage"] {
         display: flex;
         justify-content: center;
@@ -112,7 +122,6 @@ st.markdown("""
         box-shadow: none !important;
     }
 
-    /* Estilos de inputs de Tallas */
     div[data-testid="stNumberInput"] {
         background: rgba(22, 27, 34, 0.85);
         border: 1px solid #30363d;
@@ -135,7 +144,6 @@ st.markdown("""
         border: none !important;
     }
 
-    /* Selector de color */
     div[data-testid="stRadio"] > div {
         gap: 8px !important;
         flex-wrap: wrap !important;
@@ -145,18 +153,6 @@ st.markdown("""
         border: 1px solid #30363d;
     }
 
-    /* Estilo para las tarjetas de las órdenes */
-    div[data-testid="stVerticalBlock"] > div:has(div.order-card-marker) {
-        background-color: rgba(22, 27, 34, 0.75);
-        border: 1px solid #30363d;
-        border-left: 4px solid #58a6ff;
-        border-radius: 10px;
-        padding: 16px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    }
-
-    /* MEDIA QUERIES: PC VS MÓVIL */
     @media (min-width: 992px) {
         [data-testid="stImage"] img {
             max-height: 380px !important;
@@ -250,17 +246,7 @@ def obtener_badge_estado(estado):
         "Orden Entregada": ("#3fb950", "rgba(63, 185, 80, 0.15)")
     }
     color_texto, color_bg = colores.get(estado, ("#8b949e", "rgba(139, 148, 158, 0.15)"))
-    return f"""<span style="
-        background-color: {color_bg};
-        color: {color_texto};
-        border: 1px solid {color_texto};
-        padding: 3px 10px;
-        border-radius: 12px;
-        font-weight: 600;
-        font-size: 0.82rem;
-        display: inline-block;
-        white-space: nowrap;
-    ">{estado}</span>"""
+    return f'<span style="background-color: {color_bg}; color: {color_texto}; border: 1px solid {color_texto}; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 0.82rem; display: inline-block; white-space: nowrap;">{estado}</span>'
 
 # Estado global
 if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
@@ -328,7 +314,7 @@ st.markdown("---")
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "📦 Almacén", "⚙️ Usuarios"])
 
 # ==============================================================================
-# TAB 1: VER ÓRDENES (TARJETAS VISUALMENTE SEPARADAS)
+# TAB 1: VER ÓRDENES
 # ==============================================================================
 with tabs[0]:
     st.subheader("📋 Listado de Órdenes")
@@ -355,9 +341,8 @@ with tabs[0]:
                 estado_actual = o.get('estado', 'Pendiente')
                 historial_db = o.get('historial', "[]")
                 
-                # Tarjeta contenedora de la orden
-                with st.container():
-                    st.markdown('<div class="order-card-marker"></div>', unsafe_allow_html=True)
+                # Usamos el contenedor nativo con border=True
+                with st.container(border=True):
                     col_res, col_act = st.columns([2.2, 1.8])
                     with col_res: 
                         badge_html = obtener_badge_estado(estado_actual)
@@ -395,8 +380,6 @@ with tabs[0]:
                                 for reg in registros[:5]:
                                     st.caption(f"🕒 {reg.get('fecha', '-')} | 👤 {reg.get('usuario', '-')}: {reg.get('de', '')} ➡️ {reg.get('a', '')}")
                         except: st.caption("Sin historial.")
-                
-                st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
         else: st.info("No hay órdenes encontradas.")
     except Exception as e: st.error(f"Error: {e}")
 
@@ -435,7 +418,7 @@ with tabs[1]:
             st.rerun()
 
 # ==============================================================================
-# TAB 3: ALMACÉN (DIFERENCIADO PC VS MÓVIL)
+# TAB 3: ALMACÉN
 # ==============================================================================
 with tabs[2]:
     st.subheader("📦 Control de Inventario")

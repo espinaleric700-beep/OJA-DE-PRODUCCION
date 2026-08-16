@@ -7,12 +7,13 @@ import urllib.request
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_autorefresh import st_autorefresh
+from streamlit_js_eval import streamlit_js_eval
 from supabase import create_client
 
 # ==============================================================================
 # MÓDULO AUTO-PING EN SEGUNDO PLANO
 # ==============================================================================
-URL_DE_MI_APP = "https://tu-app.streamlit.app"
+URL_DE_MI_APP = "https://tu-app.streamlit.app"  # <--- Reemplaza con tu URL real
 
 def keep_server_alive_loop(app_url, interval_seconds=300):
     time.sleep(10)
@@ -38,7 +39,7 @@ if "keep_alive_thread_started" not in st.session_state:
     ping_thread.start()
 
 # ==============================================================================
-# CONFIGURACIÓN Y ESTILO VISUAL REDISEÑADO (UI MODERNA Y COMPACTA)
+# CONFIGURACIÓN Y ESTILOS CSS ADAPTATIVOS (PC VS MÓVIL)
 # ==============================================================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
@@ -62,13 +63,10 @@ components.html(
 
 st.markdown("""
     <style>
-    /* Fondo general */
+    /* Estilos Generales Dark Theme */
     .stApp { background-color: #0d1117; color: #e6edf3; }
-    
-    /* Ocultar barra lateral nativa */
     [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
     
-    /* Tarjeta de usuario */
     .user-card {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -77,7 +75,6 @@ st.markdown("""
         font-size: 0.85rem;
     }
 
-    /* Botones generales */
     .stButton > button {
         border-radius: 6px !important;
         font-weight: 600 !important;
@@ -93,30 +90,23 @@ st.markdown("""
         border-color: #58a6ff !important;
     }
 
-    /* ==========================================================================
-       OPTIMIZACIÓN DEL PRODUCTO Y LAS TALLAS (ESTILO DASHBOARD MODERNO)
-       ========================================================================== */
-    /* Contenedor de la foto del producto */
+    /* Imagen general */
     [data-testid="stImage"] {
         display: flex;
         justify-content: center;
         align-items: center;
         background: #ffffff;
         border-radius: 12px;
-        padding: 12px;
+        padding: 10px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     }
-    [data-testid="stImage"] img {
-        max-height: 320px !important;
-        object-fit: contain !important;
-    }
 
-    /* Campos numéricos de tallas ultra-compactos */
+    /* Estilos de inputs de Tallas */
     div[data-testid="stNumberInput"] {
         background: #161b22;
         border: 1px solid #30363d;
         border-radius: 8px;
-        padding: 6px 8px;
+        padding: 4px 6px;
         margin-bottom: 4px;
     }
     div[data-testid="stNumberInput"] label {
@@ -124,23 +114,17 @@ st.markdown("""
         color: #8b949e !important;
         font-weight: 700;
         text-transform: uppercase;
-        margin-bottom: -2px;
     }
     div[data-testid="stNumberInput"] input {
         height: 32px !important;
-        font-size: 0.9rem !important;
+        font-size: 0.88rem !important;
         background-color: transparent !important;
         color: #ffffff !important;
         text-align: center;
         border: none !important;
     }
 
-    /* Selector de color estilizado */
-    div[data-testid="stRadio"] > label {
-        font-weight: 600;
-        color: #8b949e;
-        margin-bottom: 6px;
-    }
+    /* Selector de color */
     div[data-testid="stRadio"] > div {
         gap: 8px !important;
         flex-wrap: wrap !important;
@@ -150,18 +134,41 @@ st.markdown("""
         border: 1px solid #30363d;
     }
 
-    /* Adaptación para pantallas móviles */
+    /* ==========================================================================
+       MEDIA QUERIES: AJUSTES ESPECÍFICOS PARA PC
+       ========================================================================== */
+    @media (min-width: 992px) {
+        [data-testid="stImage"] img {
+            max-height: 380px !important;
+            object-fit: contain !important;
+        }
+    }
+
+    /* ==========================================================================
+       MEDIA QUERIES: AJUSTES ESPECÍFICOS PARA MÓVILES
+       ========================================================================== */
     @media (max-width: 768px) {
         .block-container {
-            padding: 0.6rem !important;
+            padding: 0.5rem 0.5rem 2rem 0.5rem !important;
         }
         [data-testid="stImage"] img {
-            max-height: 220px !important;
+            max-height: 210px !important;
+            object-fit: contain !important;
+        }
+        div[data-testid="stRadio"] > div {
+            padding: 6px 8px;
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
+# Detectar ancho de la pantalla dinámicamente mediante JS
+ancho_pantalla = streamlit_js_eval(js_expressions='window.innerWidth', key='viewport_width')
+es_movil = (ancho_pantalla < 768) if ancho_pantalla is not None else False
+
+# ==============================================================================
+# CONEXIÓN SUPABASE Y DATOS BASE
+# ==============================================================================
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -214,7 +221,7 @@ def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, histori
     lista_historial.insert(0, nuevo_registro)
     supabase.table("ordenes").update({"estado": nuevo_estado, "historial": json.dumps(lista_historial)}).eq("id", o_id).execute()
 
-# Estado global inicial
+# Estado global
 if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 if "colores_inventario_avanzado" not in st.session_state: st.session_state["colores_inventario_avanzado"] = {}
 if "sync_trigger" not in st.session_state: st.session_state["sync_trigger"] = 0
@@ -279,6 +286,9 @@ st.markdown("---")
 
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "📦 Almacén", "⚙️ Usuarios"])
 
+# ==============================================================================
+# TAB 1: VER ÓRDENES
+# ==============================================================================
 with tabs[0]:
     st.subheader("📋 Listado de Órdenes")
     col_f1, col_f2 = st.columns(2)
@@ -335,6 +345,9 @@ with tabs[0]:
         else: st.info("No hay órdenes encontradas.")
     except Exception as e: st.error(f"Error: {e}")
 
+# ==============================================================================
+# TAB 2: NUEVA ORDEN
+# ==============================================================================
 with tabs[1]:
     st.subheader("➕ Crear Nueva Orden")
     numero_auto = obtener_siguiente_numero_orden()
@@ -366,6 +379,9 @@ with tabs[1]:
             st.success("¡Orden creada!")
             st.rerun()
 
+# ==============================================================================
+# TAB 3: ALMACÉN (DIFERENCIADO PC VS MÓVIL)
+# ==============================================================================
 with tabs[2]:
     st.subheader("📦 Control de Inventario")
     puede_modificar = st.session_state['rol'] in ["Administrador", "Recepción", "Almacén"]
@@ -406,9 +422,11 @@ with tabs[2]:
                 
                 if color_activo:
                     st.markdown(f"📏 **Tallas para `{color_activo}`**")
-                    cols_grid = st.columns(3)
+                    # Ajuste de columnas para creación
+                    cols_grid = st.columns(2 if es_movil else 5)
+                    num_cols = len(cols_grid)
                     for idx, talla in enumerate(tallas_disponibles):
-                        col_actual = cols_grid[idx % 3]
+                        col_actual = cols_grid[idx % num_cols]
                         with col_actual:
                             val_actual = st.session_state["colores_inventario_avanzado"][color_activo]["tallas"].get(talla, 0)
                             nueva_cant = st.number_input(f"Talla {talla}", min_value=0, step=1, value=int(val_actual), key=f"cant_v2_{color_activo}_{talla}")
@@ -498,23 +516,22 @@ with tabs[2]:
                         
                         data_color = dict_colores.get(color_sel, {})
                         
-                        # ESTRUCTURA EN 2 COLUMNAS PRINCIPALES: IMAGEN IZQ / TALLAS DER
-                        col_img, col_info = st.columns([1, 1.8], gap="medium")
-                        
-                        with col_img:
+                        # ==========================================================
+                        # LÓGICA VISTA PC VS VISTA MÓVIL
+                        # ==========================================================
+                        if es_movil:
+                            # VISTA MÓVIL: Imagen arriba, tallas abajo en 2 columnas
                             if data_color.get("imagen_url"): 
                                 st.image(data_color["imagen_url"], use_container_width=True)
                             else:
                                 st.caption("📷 Sin imagen disponible")
-                                
-                        with col_info:
+                            
                             st.markdown(f"**Tallas Disponibles (`{color_sel}`):**")
                             tallas_del_color = data_color.get("tallas", {})
                             
-                            # GRID ULTRA-COMPACTO DE 3 COLUMNAS PARA LAS TALLAS
-                            cols_tallas_grid = st.columns(3)
+                            cols_tallas_grid = st.columns(2)
                             for idx, talla in enumerate(tallas_disponibles):
-                                target_col = cols_tallas_grid[idx % 3]
+                                target_col = cols_tallas_grid[idx % 2]
                                 with target_col:
                                     cantidad = int(tallas_del_color.get(talla, 0))
                                     if puede_modificar:
@@ -530,6 +547,38 @@ with tabs[2]:
                                             supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
                                     else:
                                         st.markdown(f"**Talla {talla}:** `{cantidad:02d}`")
+                        else:
+                            # VISTA PC: Imagen a la izquierda, tallas a la derecha en 5 columnas
+                            col_img, col_info = st.columns([1, 2], gap="large")
+                            
+                            with col_img:
+                                if data_color.get("imagen_url"): 
+                                    st.image(data_color["imagen_url"], use_container_width=True)
+                                else:
+                                    st.caption("📷 Sin imagen disponible")
+                                    
+                            with col_info:
+                                st.markdown(f"**Tallas Disponibles (`{color_sel}`):**")
+                                tallas_del_color = data_color.get("tallas", {})
+                                
+                                cols_tallas_grid = st.columns(5)
+                                for idx, talla in enumerate(tallas_disponibles):
+                                    target_col = cols_tallas_grid[idx % 5]
+                                    with target_col:
+                                        cantidad = int(tallas_del_color.get(talla, 0))
+                                        if puede_modificar:
+                                            nueva_cant = st.number_input(
+                                                f"Talla {talla}", 
+                                                min_value=0, 
+                                                step=1, 
+                                                value=cantidad, 
+                                                key=f"num_{item_id}_{color_sel}_{talla}_{trigger_val}"
+                                            )
+                                            if nueva_cant != cantidad:
+                                                dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
+                                                supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                        else:
+                                            st.markdown(f"**Talla {talla}:** `{cantidad:02d}`")
 
                     if puede_modificar:
                         with st.expander(f"⚙️ Ajustes de {p_nombre}"):
@@ -553,6 +602,9 @@ with tabs[2]:
 
     render_inventario_fresco(st.session_state["sync_trigger"])
 
+# ==============================================================================
+# TAB 4: USUARIOS
+# ==============================================================================
 with tabs[3]:
     if st.session_state['rol'] == "Administrador":
         st.subheader("👥 Gestión de Usuarios")

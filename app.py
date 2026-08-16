@@ -672,7 +672,9 @@ with tabs[1]:
 # ==============================================================================
 with tabs[2]:
     st.subheader("📦 Control de Inventario")
-    puede_modificar = st.session_state['rol'] in ["Administrador", "Recepción", "Almacén"]
+    
+    # Restringido estrictamente a Administrador y Almacén
+    puede_modificar = st.session_state['rol'] in ["Administrador", "Almacén"]
 
     if puede_modificar:
         with st.expander("➕ Agregar Producto", expanded=False):
@@ -805,14 +807,54 @@ with tabs[2]:
                                     else:
                                         st.caption("Sin imagen")
                     
+                    # Funcionalidad de edición de stock exclusiva para Administrador y Almacén
                     if puede_modificar:
-                        if st.button(f"🗑️ Eliminar Producto", key=f"del_prod_{p_id}"):
-                            try:
-                                supabase.table("almacen").delete().eq("id", p_id).execute()
-                                st.success("Producto eliminado.")
+                        edit_inv_key = f"edit_inv_mode_{p_id}"
+                        if edit_inv_key not in st.session_state:
+                            st.session_state[edit_inv_key] = False
+
+                        col_btn_edit, col_btn_del = st.columns(2)
+                        with col_btn_edit:
+                            if st.button(f"✏️ Editar Cantidades", key=f"btn_toggle_edit_inv_{p_id}"):
+                                st.session_state[edit_inv_key] = not st.session_state[edit_inv_key]
                                 st.rerun()
-                            except Exception as ex:
-                                st.error(f"Error al eliminar: {ex}")
+                        with col_btn_del:
+                            if st.button(f"🗑️ Eliminar Producto", key=f"del_prod_{p_id}"):
+                                try:
+                                    supabase.table("almacen").delete().eq("id", p_id).execute()
+                                    st.success("Producto eliminado.")
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Error al eliminar: {ex}")
+
+                        if st.session_state.get(edit_inv_key, False):
+                            st.markdown("---")
+                            st.markdown("#### ✏️ Modificar Stock de este Producto")
+                            p_datos_mod = p_datos.copy()
+                            
+                            color_edit_sel = st.selectbox("Seleccionar Color a Modificar", list(p_datos_mod.keys()), key=f"sel_color_edit_{p_id}")
+                            
+                            if color_edit_sel in p_datos_mod:
+                                tallas_actuales_color = p_datos_mod[color_edit_sel].get("tallas", {})
+                                nuevas_tallas_color = {}
+                                
+                                cols_edit_grid = st.columns(4)
+                                for idx_t, talla_s in enumerate(tallas_disponibles):
+                                    with cols_edit_grid[idx_t % 4]:
+                                        val_actual_t = tallas_actuales_color.get(talla_s, 0)
+                                        nv = st.number_input(f"Talla {talla_s}", min_value=0, value=int(val_actual_t), step=1, key=f"inv_edit_{p_id}_{color_edit_sel}_{talla_s}")
+                                        nuevas_tallas_color[talla_s] = int(nv)
+                                
+                                p_datos_mod[color_edit_sel]["tallas"] = nuevas_tallas_color
+                                
+                                if st.button("💾 Guardar Nuevo Stock", key=f"btn_save_inv_{p_id}"):
+                                    try:
+                                        supabase.table("almacen").update({"tallas_existencias": json.dumps(p_datos_mod)}).eq("id", p_id).execute()
+                                        st.session_state[edit_inv_key] = False
+                                        st.success("¡Stock actualizado correctamente!")
+                                        st.rerun()
+                                    except Exception as err:
+                                        st.error(f"Error al actualizar stock: {err}")
         else:
             st.caption("No hay productos registrados en el almacén.")
     except Exception as e:

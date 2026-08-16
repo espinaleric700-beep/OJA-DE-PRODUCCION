@@ -518,7 +518,16 @@ with tabs[0]:
                                     url_f = item_file.get("url", "") if isinstance(item_file, dict) else item_file
                                     nom_f = item_file.get("nombre", f"Archivo {idx_arch+1}") if isinstance(item_file, dict) else f"Archivo {idx_arch+1}"
                                     if url_f:
-                                        st.markdown(f"- 📄 [{nom_f}]({url_f})")
+                                        # Verificamos si es una imagen para mostrar miniatura
+                                        ext_archivo = nom_f.lower().split('.')[-1] if '.' in nom_f else ""
+                                        if ext_archivo in ["png", "jpg", "jpeg", "webp", "gif"]:
+                                            col_thumb, col_link = st.columns([1, 4])
+                                            with col_thumb:
+                                                st.image(url_f, width=70)
+                                            with col_link:
+                                                st.markdown(f"📄 [{nom_f}]({url_f})")
+                                        else:
+                                            st.markdown(f"- 📄 [{nom_f}]({url_f})")
                             else:
                                 st.caption("No se adjuntaron archivos en esta orden.")
                         except Exception:

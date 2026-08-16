@@ -1,50 +1,47 @@
 from datetime import datetime
-import json
 import re
-import threading
-import time
-import urllib.request
 import streamlit as st
 import streamlit.components.v1 as components
-from streamlit_autorefresh import st_autorefresh
-from streamlit_js_eval import streamlit_js_eval
 from supabase import create_client
 
 # ==============================================================================
-# CONFIGURACIÓN
+# CONFIGURACIÓN Y CONSTANTES
 # ==============================================================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
+
+# Configuración de listas maestras
+LISTA_ESTADOS = ["Pendiente", "Recepción", "Producción - Bordados", "Producción - Impresión", "Producción - Transferencia Térmica", "Orden Detenida", "Orden Cancelada", "Orden Entregada"]
+TALLAS_DISPONIBLES = ["2", "4", "6", "8", "10", "12", "14", "16", "S", "M", "WS", "WM", "L", "XL", "2XL", "3XL"]
 
 # Conexión Supabase
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Estilos
+# Estilos CSS
 st.markdown("""
     <style>
     .stApp { background-color: #0b0e14; color: #e6edf3; }
-    [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
+    [data-testid="stSidebar"] { display: none; }
     </style>
 """, unsafe_allow_html=True)
 
-# Helper para subir archivos
-def subir_a_supabase(file_bytes, file_name, bucket="disenos", carpeta="almacen"):
+def subir_a_supabase(file_bytes, file_name, bucket="disenos", carpeta="inventario"):
     path = f"{carpeta}/{datetime.now().strftime('%Y%m%d%H%M%S')}_{re.sub(r'[^a-zA-Z0-9_.-]', '_', file_name)}"
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
 # ==============================================================================
-# CONTROL DE ACCESO
+# AUTENTICACIÓN
 # ==============================================================================
-if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
+if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "rol": ""})
 
 if not st.session_state["autenticado"]:
-    st.markdown("#### 🔐 Control de Acceso")
+    st.markdown("#### 🔐 Acceso al Sistema")
     u, p = st.text_input("Usuario"), st.text_input("Contraseña", type="password")
     if st.button("Iniciar Sesión"):
         if u.lower() == "admin" and p == "2580Admin":
-            st.session_state.update({"autenticado": True, "usuario": "admin", "rol": "Administrador"})
+            st.session_state.update({"autenticado": True, "rol": "Administrador"})
             st.rerun()
     st.stop()
 
@@ -52,67 +49,64 @@ if not st.session_state["autenticado"]:
 # INTERFAZ PRINCIPAL
 # ==============================================================================
 st.title("🧵 Pixel Thread")
-tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "📦 Almacén"])
+tabs = st.tabs(["📋 Órdenes", "➕ Nueva Orden", "📦 Almacén"])
 
 # TAB 1: ÓRDENES
 with tabs[0]:
-    st.subheader("📋 Listado de Órdenes")
+    st.subheader("📋 Gestión de Órdenes")
     try:
         ordenes = supabase.table("ordenes").select("*").execute().data
         for o in ordenes:
             with st.container(border=True):
-                st.write(f"**Orden #{o.get('numero_orden')}** | Cliente: {o.get('nombre_cliente')}")
-    except Exception as e:
-        st.error("Error al cargar órdenes.")
+                st.markdown(f"**Orden #{o.get('numero_orden', 'N/A')}** - {o.get('nombre_cliente')}")
+                st.info(f"Estado: {o.get('estado')}")
+    except Exception:
+        st.error("No se pudieron cargar las órdenes.")
 
 # TAB 2: NUEVA ORDEN
 with tabs[1]:
     st.subheader("➕ Crear Nueva Orden")
-    with st.form("form_nueva_orden"):
-        nombre = st.text_input("Nombre Cliente")
-        if st.form_submit_button("Guardar Orden"):
-            try:
-                supabase.table("ordenes").insert({"nombre_cliente": nombre, "estado": "Pendiente"}).execute()
-                st.success("Orden creada")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
+    with st.form("form_orden"):
+        nombre = st.text_input("Nombre del Cliente")
+        estado = st.selectbox("Estado inicial", LISTA_ESTADOS)
+        tallas = st.multiselect("Tallas requeridas", TALLAS_DISPONIBLES)
+        if st.form_submit_button("Crear Orden"):
+            supabase.table("ordenes").insert({"nombre_cliente": nombre, "estado": estado, "tallas": tallas}).execute()
+            st.success("Orden registrada.")
+            st.rerun()
 
-# TAB 3: ALMACÉN (CON PROTECCIÓN DE ERRORES)
+# TAB 3: ALMACÉN
 with tabs[2]:
-    st.subheader("📦 Control de Inventario")
+    st.subheader("📦 Inventario de Productos")
     
-    with st.expander("➕ Agregar Producto", expanded=False):
-        with st.form("form_agregar_producto"):
-            inv_nombre = st.text_input("NOMBRE DE LA PRENDA")
-            nuevo_color = st.text_input("COLOR")
-            foto_color = st.file_uploader("🖼️ Imagen", type=["png", "jpg"])
+    with st.expander("➕ Agregar nuevo producto al stock"):
+        with st.form("form_inventario"):
+            prod_nombre = st.text_input("Nombre de la prenda")
+            prod_color = st.text_input("Color")
+            foto = st.file_uploader("Subir imagen de referencia", type=["png", "jpg"])
             
-            if st.form_submit_button("💾 Guardar Producto"):
-                url_foto = ""
-                if foto_color:
-                    url_foto = subir_a_supabase(foto_color.getvalue(), foto_color.name, bucket="disenos", carpeta="inventario")
-                
+            if st.form_submit_button("Guardar en Inventario"):
+                url_img = subir_a_supabase(foto.getvalue(), foto.name) if foto else ""
                 try:
                     supabase.table("inventario").insert({
-                        "nombre_prenda": inv_nombre,
-                        "color": nuevo_color,
-                        "imagen_url": url_foto
+                        "nombre_prenda": prod_nombre,
+                        "color": prod_color,
+                        "imagen_url": url_img
                     }).execute()
-                    st.success("Producto guardado")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error: La tabla 'inventario' no existe o no es accesible. {e}")
+                    st.error(f"Error de base de datos: {e}")
 
-    # Visualización protegida
-    st.markdown("---")
+    # Mostrar inventario
     try:
-        res_inv = supabase.table("inventario").select("*").execute()
-        if res_inv.data:
-            for item in res_inv.data:
-                with st.container(border=True):
-                    st.markdown(f"#### {item.get('nombre_prenda')} | Color: {item.get('color')}")
-        else:
-            st.info("No hay productos registrados.")
+        inventario = supabase.table("inventario").select("*").execute().data
+        for item in inventario:
+            with st.container(border=True):
+                c1, c2 = st.columns([1, 3])
+                with c1:
+                    if item.get("imagen_url"): st.image(item["imagen_url"], width=100)
+                with c2:
+                    st.markdown(f"**{item.get('nombre_prenda')}**")
+                    st.write(f"🎨 Color: {item.get('color')}")
     except Exception:
-        st.warning("⚠️ La tabla 'inventario' no existe en Supabase. Por favor, créala para usar el Almacén.")
+        st.warning("La tabla de inventario no está configurada correctamente.")

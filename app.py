@@ -112,6 +112,7 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
     }
 
+    /* Fusión de imágenes con el fondo de la pantalla */
     [data-testid="stImage"] {
         display: flex;
         justify-content: center;
@@ -120,6 +121,11 @@ st.markdown("""
         border-radius: 0px !important;
         padding: 0px !important;
         box-shadow: none !important;
+    }
+
+    [data-testid="stImage"] img {
+        mix-blend-mode: multiply !important;
+        filter: contrast(105%) brightness(102%);
     }
 
     div[data-testid="stNumberInput"] {
@@ -341,7 +347,6 @@ with tabs[0]:
                 estado_actual = o.get('estado', 'Pendiente')
                 historial_db = o.get('historial', "[]")
                 
-                # Usamos el contenedor nativo con border=True
                 with st.container(border=True):
                     col_res, col_act = st.columns([2.2, 1.8])
                     with col_res: 

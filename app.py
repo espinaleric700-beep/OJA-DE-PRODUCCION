@@ -232,6 +232,30 @@ def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, histori
     lista_historial.insert(0, nuevo_registro)
     supabase.table("ordenes").update({"estado": nuevo_estado, "historial": json.dumps(lista_historial)}).eq("id", o_id).execute()
 
+def obtener_badge_estado(estado):
+    colores = {
+        "Pendiente": ("#e3b341", "rgba(227, 179, 65, 0.15)"),
+        "Recepción": ("#58a6ff", "rgba(88, 166, 255, 0.15)"),
+        "Producción - Bordados": ("#bc8cff", "rgba(188, 140, 255, 0.15)"),
+        "Producción - Impresión": ("#36a3f7", "rgba(54, 163, 247, 0.15)"),
+        "Producción - Transferencia Térmica": ("#f0883e", "rgba(240, 136, 62, 0.15)"),
+        "Orden Detenida": ("#d29922", "rgba(210, 153, 34, 0.15)"),
+        "Orden Cancelada": ("#f85149", "rgba(248, 81, 73, 0.15)"),
+        "Orden Entregada": ("#3fb950", "rgba(63, 185, 80, 0.15)")
+    }
+    color_texto, color_bg = colores.get(estado, ("#8b949e", "rgba(139, 148, 158, 0.15)"))
+    return f"""<span style="
+        background-color: {color_bg};
+        color: {color_texto};
+        border: 1px solid {color_texto};
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.82rem;
+        display: inline-block;
+        white-space: nowrap;
+    ">{estado}</span>"""
+
 # Estado global
 if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 if "colores_inventario_avanzado" not in st.session_state: st.session_state["colores_inventario_avanzado"] = {}
@@ -320,8 +344,10 @@ with tabs[0]:
         if ordenes:
             for o in ordenes:
                 o_id = o.get("id"); numero_o = o.get('numero_orden', 'S/N'); cliente_o = o.get('nombre_cliente', 'Sin cliente'); estado_actual = o.get('estado', 'Pendiente'); historial_db = o.get('historial', "[]")
-                col_res, col_act = st.columns([2, 2])
-                with col_res: st.markdown(f"**Orden #{numero_o}** - {cliente_o}\n*Estado:* **{estado_actual}**")
+                col_res, col_act = st.columns([2.2, 1.8])
+                with col_res: 
+                    badge_html = obtener_badge_estado(estado_actual)
+                    st.markdown(f"**Orden #{numero_o}** - {cliente_o} {badge_html}", unsafe_allow_html=True)
                 with col_act:
                     cols_action = st.columns([2, 1])
                     idx_actual = lista_estados.index(estado_actual) if estado_actual in lista_estados else 0

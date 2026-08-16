@@ -38,7 +38,7 @@ if "keep_alive_thread_started" not in st.session_state:
     ping_thread.start()
 
 # ==============================================================================
-# CONFIGURACIÓN Y ESTILO VISUAL (FORZADO SIDE-BY-SIDE PARA MÓVIL)
+# CONFIGURACIÓN Y ESTILO VISUAL REDISEÑADO
 # ==============================================================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
@@ -65,10 +65,10 @@ st.markdown("""
     /* Fondo principal y textos */
     .stApp { background-color: #0b0f19; color: #f3f4f6; }
     
-    /* Ocultar la barra lateral nativa de Streamlit */
+    /* Ocultar barra lateral nativa */
     [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
     
-    /* Estilo para la caja de información del usuario */
+    /* Tarjeta de usuario */
     .user-card {
         background-color: #111827;
         border: 1px solid #1f2937;
@@ -77,7 +77,7 @@ st.markdown("""
         font-size: 0.85rem;
     }
 
-    /* Mejora de botones */
+    /* Botones principales */
     .stButton > button {
         border-radius: 6px !important;
         font-weight: 600 !important;
@@ -92,7 +92,56 @@ st.markdown("""
     }
 
     /* ==========================================================================
-       OPTIMIZACIÓN MÓVIL: MANTENER VISTA PARALELA (CAMISETA Y TALLAS LADO A LADO)
+       MEJORAS DE DISEÑO: COMPACTACIÓN DE TALLAS E IMAGEN EN GRID
+       ========================================================================== */
+    /* Limitar la altura de la imagen para que coincida con el bloque de tallas */
+    .stImage img {
+        max-height: 380px !important;
+        object-fit: contain !important;
+        background-color: #ffffff;
+        border-radius: 10px;
+        padding: 8px;
+    }
+
+    /* Entradas de números (Tallas) compactas */
+    div[data-testid="stNumberInput"] {
+        margin-bottom: -6px;
+    }
+    div[data-testid="stNumberInput"] label {
+        font-size: 0.8rem !important;
+        color: #9ca3af !important;
+        font-weight: 600;
+    }
+    div[data-testid="stNumberInput"] input {
+        height: 36px !important;
+        font-size: 0.85rem !important;
+        background-color: #1f2937 !important;
+        color: #ffffff !important;
+        border-radius: 6px !important;
+    }
+
+    /* Selector de color horizontal más elegante */
+    div[data-testid="stRadio"] > div {
+        gap: 12px !important;
+        flex-wrap: wrap !important;
+        background: #111827;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid #1f2937;
+        margin-bottom: 12px;
+    }
+
+    /* Tarjeta contenedora de producto */
+    .product-box {
+        background-color: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+
+    /* ==========================================================================
+       ADAPTACIÓN MÓVIL (PANTALLAS PEQUEÑAS)
        ========================================================================== */
     @media (max-width: 768px) {
         .block-container {
@@ -101,7 +150,6 @@ st.markdown("""
             padding-top: 0.8rem !important;
         }
 
-        /* CONTENEDOR PARALELO EN MÓVIL */
         div[data-testid="stHorizontalBlock"].side-by-side-container {
             display: flex !important;
             flex-direction: row !important;
@@ -109,7 +157,6 @@ st.markdown("""
             gap: 8px !important;
         }
 
-        /* Fuerza 50% de ancho a cada columna dentro del contenedor paralelo */
         div[data-testid="stHorizontalBlock"].side-by-side-container > div[data-testid="column"] {
             width: 50% !important;
             flex: 1 1 50% !important;
@@ -117,15 +164,8 @@ st.markdown("""
             margin-bottom: 0 !important;
         }
 
-        /* Ajustes de escala para la vista dividida */
         .stImage img {
-            max-height: 220px !important;
-            object-fit: contain !important;
-        }
-
-        .stNumberInput input {
-            font-size: 12px !important;
-            padding: 2px 4px !important;
+            max-height: 230px !important;
         }
 
         div[data-baseweb="tab-list"] {
@@ -136,10 +176,6 @@ st.markdown("""
             font-size: 0.72rem !important;
             padding: 5px 8px !important;
         }
-
-        h1 { font-size: 1.4rem !important; }
-        h2 { font-size: 1.2rem !important; }
-        h3 { font-size: 1.05rem !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -466,11 +502,13 @@ with tabs[2]:
                     except Exception:
                         dict_colores = {}
 
+                    # TÍTULO DEL PRODUCTO
                     st.markdown(f"#### 🏷️ {p_nombre}")
                     
                     if dict_colores:
                         lista_cols = list(dict_colores.keys())
                         
+                        # Selector de Color Horizontal
                         color_sel = st.radio(
                             "Selecciona Color:",
                             options=lista_cols,
@@ -480,9 +518,9 @@ with tabs[2]:
                         
                         data_color = dict_colores.get(color_sel, {})
                         
-                        # CONTENEDOR FLEXBOX SIDE-BY-SIDE PARA MÓVIL
+                        # BLOQUE SIDE-BY-SIDE CON GRID INTERNO PARA TALLAS
                         st.markdown('<div class="side-by-side-container">', unsafe_allow_html=True)
-                        col_img, col_info = st.columns([1, 1])
+                        col_img, col_info = st.columns([1, 1.2])
                         
                         with col_img:
                             if data_color.get("imagen_url"): 
@@ -491,24 +529,28 @@ with tabs[2]:
                                 st.caption("📷 Sin imagen")
                                 
                         with col_info:
-                            st.markdown(f"**Tallas (`{color_sel}`):**")
+                            st.markdown(f"**Tallas Disponibles (`{color_sel}`):**")
                             tallas_del_color = data_color.get("tallas", {})
                             
-                            for talla in tallas_disponibles:
-                                cantidad = int(tallas_del_color.get(talla, 0))
-                                if puede_modificar:
-                                    nueva_cant = st.number_input(
-                                        f"Talla {talla}", 
-                                        min_value=0, 
-                                        step=1, 
-                                        value=cantidad, 
-                                        key=f"num_{item_id}_{color_sel}_{talla}_{trigger_val}"
-                                    )
-                                    if nueva_cant != cantidad:
-                                        dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
-                                        supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
-                                else:
-                                    st.markdown(f"**{talla}:** `{cantidad:02d}`")
+                            # ORGANIZACIÓN EN GRID DE 2 COLUMNAS INTERNAS PARA TALLAS
+                            cols_tallas_grid = st.columns(2)
+                            for idx, talla in enumerate(tallas_disponibles):
+                                target_col = cols_tallas_grid[idx % 2]
+                                with target_col:
+                                    cantidad = int(tallas_del_color.get(talla, 0))
+                                    if puede_modificar:
+                                        nueva_cant = st.number_input(
+                                            f"Talla {talla}", 
+                                            min_value=0, 
+                                            step=1, 
+                                            value=cantidad, 
+                                            key=f"num_{item_id}_{color_sel}_{talla}_{trigger_val}"
+                                        )
+                                        if nueva_cant != cantidad:
+                                            dict_colores[color_sel]["tallas"][talla] = int(nueva_cant)
+                                            supabase.table("almacen").update({"tallas_existencias": json.dumps(dict_colores)}).eq("id", item_id).execute()
+                                    else:
+                                        st.markdown(f"**Talla {talla}:** `{cantidad:02d}`")
 
                         st.markdown('</div>', unsafe_allow_html=True)
 

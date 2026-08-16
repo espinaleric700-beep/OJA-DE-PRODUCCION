@@ -298,7 +298,7 @@ def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, histori
     except Exception as e:
         st.error(f"Error actualizando estado en Supabase: {e}")
 
-def obtener_badge_estado(estado):
+def obtener_badge_estado(estado, tipo_servicio=""):
     colores = {
         "Pendiente": ("#e3b341", "rgba(227, 179, 65, 0.15)"),
         "Recepción": ("#58a6ff", "rgba(88, 166, 255, 0.15)"),
@@ -312,7 +312,8 @@ def obtener_badge_estado(estado):
         "Orden Entregada": ("#3fb950", "rgba(63, 185, 80, 0.15)")
     }
     color_texto, color_bg = colores.get(estado, ("#8b949e", "rgba(139, 148, 158, 0.15)"))
-    return f'<span style="background-color: {color_bg}; color: {color_texto}; border: 1px solid {color_texto}; padding: 4px 12px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; display: inline-block; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">📍 Área / Estado: {estado}</span>'
+    texto_servicio = f" | Servicio: {tipo_servicio}" if tipo_servicio else ""
+    return f'<span style="background-color: {color_bg}; color: {color_texto}; border: 1px solid {color_texto}; padding: 4px 12px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; display: inline-block; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">📍 Área / Estado: {estado}{texto_servicio}</span>'
 
 # Estado global
 if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
@@ -410,6 +411,7 @@ with tabs[0]:
                 numero_o = o.get('nombre_orden', 'S/N')
                 cliente_o = o.get('nombre_cliente', 'Sin cliente')
                 estado_actual = o.get('estado_actual', 'Pendiente')
+                tipo_serv_o = o.get('tipo_servicio', '')
                 historial_db = o.get('historial', "[]")
                 archivos_db = o.get('archivos', "[]")
                 tallas_db = o.get('tallas_detalle', "[]")
@@ -418,8 +420,8 @@ with tabs[0]:
                     col_res, col_act = st.columns([2.2, 1.8])
                     with col_res: 
                         st.markdown(f"### Orden #{numero_o} - **{cliente_o}**", unsafe_allow_html=True)
-                        # Etiqueta visual clara del área / estado actual
-                        st.markdown(obtener_badge_estado(estado_actual), unsafe_allow_html=True)
+                        # Etiqueta visual clara del área / estado actual incluyendo el tipo de servicio
+                        st.markdown(obtener_badge_estado(estado_actual, tipo_serv_o), unsafe_allow_html=True)
                     
                     with col_act:
                         cols_action = st.columns([2, 1])
@@ -496,7 +498,7 @@ with tabs[0]:
                                 if st.session_state['rol'] in ["Administrador", "Recepción"]:
                                     st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
                                 st.write(f"**Fecha Entrega:** {o.get('fecha_entrega', 'N/D')}")
-                                st.write(f"**Servicio:** {o.get('tipo_servicio', 'N/D')}")
+                                st.write(f"**Servicio:** {tipo_serv_o}")
                             with col_info2:
                                 if st.session_state['rol'] in ["Administrador", "Recepción"]:
                                     st.write(f"**Total:** ${o.get('total', 0)}")

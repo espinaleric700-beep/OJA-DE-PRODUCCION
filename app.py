@@ -1,14 +1,73 @@
 from datetime import datetime
 import streamlit as st
+import streamlit.components.v1 as components
 from supabase import create_client
 import json
 import re
 from streamlit_autorefresh import st_autorefresh
 
+# ==============================================================================
+# MÓDULO AUTO-PING EN SEGUNDO PLANO (SIN SERVICIOS EXTERNOS)
+# ==============================================================================
+import threading
+import time
+import urllib.request
+
+# Reemplaza esta URL con la URL exacta y pública de tu aplicación Streamlit
+URL_DE_MI_APP = "https://tu-app.streamlit.app"  # <--- COLOCA TU URL AQUÍ
+
+def keep_server_alive_loop(app_url, interval_seconds=300):
+    """
+    Bucle en segundo plano que envía una petición HTTP a la app cada 5 minutos
+    para evitar que Streamlit Cloud la ponga en hibernación por inactividad.
+    """
+    time.sleep(10)  # Espera inicial para permitir el despliegue del servidor
+    while True:
+        try:
+            req = urllib.request.Request(
+                app_url, 
+                headers={'User-Agent': 'InternalKeepAlive/1.0'}
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                pass
+        except Exception as e:
+            # En caso de error puntual de red, el hilo continúa intentándolo
+            pass
+        time.sleep(interval_seconds)
+
+# Inicia el hilo en segundo plano solo una vez por proceso de la aplicación
+if "keep_alive_thread_started" not in st.session_state:
+    st.session_state["keep_alive_thread_started"] = True
+    ping_thread = threading.Thread(
+        target=keep_server_alive_loop, 
+        args=(URL_DE_MI_APP, 300),  # Envía ping cada 5 minutos (300 segundos)
+        daemon=True
+    )
+    ping_thread.start()
+
 # ==========================================
 # CONFIGURACIÓN Y ESTILO VISUAL (MODO OSCURO)
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
+
+# MÓDULO KEEP-ALIVE EN PESTAÑA DEL NAVEGADOR
+components.html(
+    """
+    <script>
+    function keepAlive() {
+        fetch(window.location.href, {mode: 'no-cors'}).then(() => {
+            console.log('Keep-alive ping sent successfully');
+        }).catch((err) => {
+            console.log('Keep-alive ping error:', err);
+        });
+    }
+    // Enviar un ping silencioso desde la pestaña del navegador cada 2 minutos
+    setInterval(keepAlive, 120000);
+    </script>
+    """,
+    height=0,
+    width=0
+)
 
 st.markdown("""
     <style>
@@ -104,13 +163,9 @@ st.sidebar.success(f"👋 ¡Bienvenido, **{st.session_state['usuario']}**!\n\nRo
 st.sidebar.markdown("---")
 
 # 1. Configuración del Auto-Refresh cada 10,000 milisegundos (10 segundos)
-# Esto actualiza de forma automática el contador interno sin bloquear la UI
 count = st_autorefresh(interval=10000, key="datasync_counter")
 
-# Si el temporizador se dispara, incrementamos el disparador de sincronización de manera automática
 if count > 0:
-    # Nota: el autorefresh ya recarga la página por sí solo cada 10s, 
-    # pero incrementamos el trigger para asegurar el refresco de componentes avanzados
     pass
 
 # 2. Botón opcional manual conservado en la barra lateral

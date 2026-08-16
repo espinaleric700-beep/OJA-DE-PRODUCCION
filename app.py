@@ -312,7 +312,7 @@ def obtener_badge_estado(estado):
         "Orden Entregada": ("#3fb950", "rgba(63, 185, 80, 0.15)")
     }
     color_texto, color_bg = colores.get(estado, ("#8b949e", "rgba(139, 148, 158, 0.15)"))
-    return f'<span style="background-color: {color_bg}; color: {color_texto}; border: 1px solid {color_texto}; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 0.82rem; display: inline-block; white-space: nowrap;">{estado}</span>'
+    return f'<span style="background-color: {color_bg}; color: {color_texto}; border: 1px solid {color_texto}; padding: 4px 12px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; display: inline-block; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">📍 Área / Estado: {estado}</span>'
 
 # Estado global
 if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
@@ -417,8 +417,9 @@ with tabs[0]:
                 with st.container(border=True):
                     col_res, col_act = st.columns([2.2, 1.8])
                     with col_res: 
-                        badge_html = obtener_badge_estado(estado_actual)
-                        st.markdown(f"### Orden #{numero_o} - **{cliente_o}** {badge_html}", unsafe_allow_html=True)
+                        st.markdown(f"### Orden #{numero_o} - **{cliente_o}**", unsafe_allow_html=True)
+                        # Etiqueta visual clara del área / estado actual
+                        st.markdown(obtener_badge_estado(estado_actual), unsafe_allow_html=True)
                     
                     with col_act:
                         cols_action = st.columns([2, 1])
@@ -432,7 +433,13 @@ with tabs[0]:
                                     st.success("¡Actualizado!")
                                     st.rerun()
                     
-                    with st.expander("📂 Ver detalles completos"):
+                    # Expandidor con estado persistente guardado en st.session_state para mantenerse abierto tras recargas
+                    expander_key_state = f"exp_open_{o_id}"
+                    if expander_key_state not in st.session_state:
+                        st.session_state[expander_key_state] = False
+
+                    with st.expander("📂 Ver detalles completos", expanded=st.session_state[expander_key_state]):
+                        st.session_state[expander_key_state] = True # Mantener abierto si el usuario interactúa
                         # Botón para activar Edición Total de la Orden
                         edit_order_mode_key = f"edit_order_full_mode_{o_id}"
                         if edit_order_mode_key not in st.session_state:
@@ -917,7 +924,6 @@ with tabs[2]:
                                 st.markdown("#### Editar Existencias por Color y Tallas:")
                                 temp_edit_datos = {}
                                 
-                                # Manejaremos la estructura de colores actual
                                 colores_keys_actuales = list(p_datos.keys()) if isinstance(p_datos, dict) else []
                                 
                                 for c_k in colores_keys_actuales:

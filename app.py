@@ -432,7 +432,6 @@ with tabs[0]:
                         try:
                             lista_tallas = json.loads(tallas_db) if isinstance(tallas_db, str) else tallas_db
                             
-                            # Botón de activación para editar tallas manualmente
                             edit_mode_key = f"edit_tallas_mode_{o_id}"
                             if edit_mode_key not in st.session_state:
                                 st.session_state[edit_mode_key] = False
@@ -444,10 +443,8 @@ with tabs[0]:
 
                             if st.session_state[edit_mode_key]:
                                 st.info("Modo de edición manual activo:")
-                                nuevo_detalle_tallas = []
                                 with st.form(key=f"form_edit_tallas_{o_id}"):
                                     tallas_existentes_map = {item.get("talla"): item for item in (lista_tallas if isinstance(lista_tallas, list) else [])}
-                                    
                                     tallas_a_editar = st.multiselect("Seleccionar Tallas", options=tallas_disponibles, default=list(tallas_existentes_map.keys()), key=f"ms_edit_{o_id}")
                                     
                                     temp_tallas_actualizadas = []
@@ -683,23 +680,110 @@ with tabs[1]:
 # TAB 3: ALMACÉN
 # ==============================================================================
 with tabs[2]:
-    st.subheader("📦 Control de Inventario")
-    puede_modificar = st.session_state['rol'] in ["Administrador", "Recepción", "Almacén"]
+    st.subheader("📦 Control de Almacén e Inventario")
+    
+    try:
+        res_almacen = supabase.table("almacen").select("*").execute()
+        productos = res_almacen.data if res_almacen.data else []
 
-    if puede_modificar:
-        with st.expander("➕ Agregar Producto", expanded=False):
-            inv_nombre = st.text_input("NOMBRE DE LA PRENDA", key="input_nombre_prenda_color_img")
+        with st.expander("➕ Agregar Nuevo Producto al Almacén"):
+            with st.form("form_nuevo_producto"):
+                nombre_prod = st.text_input("Nombre del Producto")
+                talla_prod = st.text_input("Talla (opcional o general)")
+                cant_prod = st.number_input("Cantidad en Existencia", min_value=0, value=0, step=1)
+                img_prod = st.text_input("URL de Imagen (opcional)", value="EMPTY")
+                
+                if st.form_submit_button("💾 Guardar Producto"):
+                    if nombre_prod.strip():
+                        supabase.table("almacen").insert({
+                            "nombre_producto": nombre_prod.strip(),
+                            "talla": talla_prod.strip() if talla_prod else None,
+                            "cant_existencia": int(cant_prod),
+                            "imagen_url": img_prod.strip() if img_prod else "EMPTY",
+                            "tallas_existencia": "{}"
+                        }).execute()
+                        st.success("¡Producto agregado con éxito!")
+                        st.rerun()
+                    else:
+                        st.error("El nombre del producto es obligatorio.")
+
+        if productos:
             st.markdown("---")
-            st.markdown("🎨 **Añadir Color e Imagen**")
+            for prod in productos:
+                p_id = prod.get("id")
+                p_nombre = prod.get("nombre_producto", "Sin nombre")
+                p_cant = prod.get("cant_existencia", 0)
+                p_talla = prod.get("talla", "N/A")
+                
+                with st.container(border=True):
+                    col_p1, col_p2, col_p3 = st.columns([2, 1, 1])
+                    with col_p1:
+                        st.markdown(f"### 🏷️ {p_nombre}")
+                        st.caption(f"Talla general: {p_talla} | Stock total: {p_cant}")
+                    with col_p2:
+                        nueva_cant = st.number_input(f"Stock ID {p_id}", min_value=0, value=int(p_cant), step=1, key=f"stock_input_{p_id}", label_visibility="collapsed")
+                    with col_p3:
+                        if st.button("Actualizar Stock", key=f"btn_update_stock_{p_id}"):
+                            supabase.table("almacen").update({"cant_existencia": int(nueva_cant)}).eq("id", p_id).execute()
+                            st.success("¡Stock actualizado!")
+                            st.rerun()
+        else:
+            st.info("No hay productos registrados en el almacén.")
             
-            col_picker, col_text = st.columns([1, 2])
-            with col_picker:
-                color_picker_val = st.color_picker("Tono", "#3b82f6", key="picker_color_hex_v2")
-            with col_text:
-                nuevo_color = st.text_input("NOMBRE DEL COLOR", value=color_picker_val, key="input_nuevo_color_nombre_v2")
+    except Exception as e:
+        st.error(f"Error al cargar el almacén: {e}")
+
+# ==============================================================================
+# TAB 4: USUARIOS
+# ==============================================================================
+with tabs[3]:
+    st.subheader("⚙️ Gestión de Usuarios y Roles")
+    if st.session_state['rol'] != "Administrador":
+        st.warning("⚠️ No tienes permisos de Administrador para gestionar usuarios.")
+    else:
+        with st.form("form_crear_usuario"):
+            st.markdown("#### Registrar Nuevo Usuario")
+            nuevo_user = st.text_input("Nombre de Usuario")
+            nuevo_pass = st.text_input("Contraseña", type="password")
+            nuevo_rol = st.selectbox("Rol Asignado", roles_disponibles)
             
-            foto_color = st.file_uploader(f"🖼️ Imagen para `{nuevo_color}`", type=["png", "jpg", "jpeg"], key=f"uploader_img_{nuevo_color}")
-            
-            if st.button("➕ Añadir Color"):
-                if nuevo_color.strip():
-                    c_clean = nuevo_color.strip()
+            if st.form_submit_button("Crear Usuario"):
+                if nuevo_user.strip() and nuevo_pass.strip():
+                    try:
+                        supabase.table("usuarios").insert({
+                            "usuario": nuevo_user.strip(),
+                            "password": nuevo_pass.strip(),
+                            "rol_id": nuevo_rol
+                        }).execute()
+                        st.success("¡Usuario creado con éxito!")
+                        st.rerun()
+                    except Exception as err:
+                        st.error(f"Error al registrar usuario: {err}")
+                else:
+                    st.error("Completa todos los campos.")
+
+        st.markdown("---")
+        st.markdown("#### Usuarios Registrados")
+        try:
+            res_users = supabase.table("usuarios").select("*").execute()
+            if res_users.data:
+                for u in res_users.data:
+                    u_id = u.get("id")
+                    u_nombre = u.get("usuario", "")
+                    u_rol = u.get("rol_id", "")
+                    
+                    col_u1, col_u2, col_u3 = st.columns([2, 2, 1])
+                    with col_u1:
+                        st.write(f"👤 **{u_nombre}**")
+                    with col_u2:
+                        st.write(f"Rol: `{u_rol}`")
+                    with col_u3:
+                        if u_nombre.lower() != "admin":
+                            if st.button("🗑️ Eliminar", key=f"del_user_{u_id}"):
+                                supabase.table("usuarios").delete().eq("id", u_id).execute()
+                                st.success("Usuario eliminado.")
+                                st.rerun()
+            else:
+                st.info("No hay usuarios adicionales registrados.")
+        except Exception as err:
+            st.error(f"Error al listar usuarios: {err}")

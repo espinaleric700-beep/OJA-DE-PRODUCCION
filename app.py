@@ -63,6 +63,7 @@ components.html(
 
 st.markdown("""
     <style>
+    /* Estilos Generales Dark Theme */
     .stApp { 
         background-color: #0b0e14;
         background-image: 
@@ -431,6 +432,7 @@ with tabs[0]:
                         try:
                             lista_tallas = json.loads(tallas_db) if isinstance(tallas_db, str) else tallas_db
                             
+                            # Botón de activación para editar tallas manualmente
                             edit_mode_key = f"edit_tallas_mode_{o_id}"
                             if edit_mode_key not in st.session_state:
                                 st.session_state[edit_mode_key] = False
@@ -442,54 +444,33 @@ with tabs[0]:
 
                             if st.session_state[edit_mode_key]:
                                 st.info("Modo de edición manual activo:")
-                                
-                                tallas_existentes_map = {}
-                                if isinstance(lista_tallas, list):
-                                    for item in lista_tallas:
-                                        if isinstance(item, dict) and "talla" in item:
-                                            tallas_existentes_map[item["talla"]] = item
-
-                                default_seleccion = list(tallas_existentes_map.keys())
-                                if not default_seleccion and tallas_disponibles:
-                                    default_seleccion = [tallas_disponibles[0]]
-
-                                tallas_a_editar = st.multiselect(
-                                    "Seleccionar Tallas", 
-                                    options=tallas_disponibles, 
-                                    default=default_seleccion, 
-                                    key=f"ms_edit_{o_id}"
-                                )
-                                
-                                temp_tallas_actualizadas = []
-                                for sz in tallas_a_editar:
-                                    datos_previos = tallas_existentes_map.get(sz, {"cantidad": 1, "comentario": ""})
-                                    c_col1, c_col2 = st.columns([1, 2])
-                                    with c_col1:
-                                        cant_val = st.number_input(
-                                            f"Cantidad {sz}", 
-                                            min_value=0, 
-                                            value=int(datos_previos.get("cantidad", 1)), 
-                                            step=1, 
-                                            key=f"edit_cant_{o_id}_{sz}"
-                                        )
-                                    with c_col2:
-                                        obs_val = st.text_input(
-                                            f"Comentario {sz}", 
-                                            value=str(datos_previos.get("comentario", "")), 
-                                            key=f"edit_obs_{o_id}_{sz}"
-                                        )
+                                nuevo_detalle_tallas = []
+                                with st.form(key=f"form_edit_tallas_{o_id}"):
+                                    # Asegurarnos de tener una estructura base editable con las tallas disponibles o las existentes
+                                    tallas_existentes_map = {item.get("talla"): item for item in (lista_tallas if isinstance(lista_tallas, list) else [])}
                                     
-                                    temp_tallas_actualizadas.append({
-                                        "talla": sz,
-                                        "cantidad": int(cant_val),
-                                        "comentario": obs_val.strip()
-                                    })
-                                
-                                if st.button("💾 Guardar Cambios de Tallas", key=f"btn_save_tallas_direct_{o_id}"):
-                                    supabase.table("ordenes").update({"tallas_detalle": json.dumps(temp_tallas_actualizadas)}).eq("id", o_id).execute()
-                                    st.session_state[edit_mode_key] = False
-                                    st.success("¡Tallas actualizadas correctamente!")
-                                    st.rerun()
+                                    tallas_a_editar = st.multiselect("Seleccionar Tallas", options=tallas_disponibles, default=list(tallas_existentes_map.keys()), key=f"ms_edit_{o_id}")
+                                    
+                                    temp_tallas_actualizadas = []
+                                    for sz in tallas_a_editar:
+                                        datos_previos = tallas_existentes_map.get(sz, {"cantidad": 1, "comentario": ""})
+                                        c_col1, c_col2 = st.columns([1, 2])
+                                        with c_col1:
+                                            cant_val = st.number_input(f"Cantidad {sz}", min_value=0, value=int(datos_previos.get("cantidad", 1)), step=1, key=f"edit_cant_{o_id}_{sz}")
+                                        with c_col2:
+                                            obs_val = st.text_input(f"Comentario {sz}", value=str(datos_previos.get("comentario", "")), key=f"edit_obs_{o_id}_{sz}")
+                                        
+                                        temp_tallas_actualizadas.append({
+                                            "talla": sz,
+                                            "cantidad": int(cant_val),
+                                            "comentario": obs_val.strip()
+                                        })
+                                    
+                                    if st.form_submit_button("💾 Guardar Cambios de Tallas"):
+                                        supabase.table("ordenes").update({"tallas_detalle": json.dumps(temp_tallas_actualizadas)}).eq("id", o_id).execute()
+                                        st.session_state[edit_mode_key] = False
+                                        st.success("¡Tallas actualizadas correctamente!")
+                                        st.rerun()
                             else:
                                 if lista_tallas and len(lista_tallas) > 0:
                                     rows_html = ""
@@ -672,9 +653,7 @@ with tabs[1]:
 # ==============================================================================
 with tabs[2]:
     st.subheader("📦 Control de Inventario")
-    
-    # Restringido estrictamente a Administrador y Almacén
-    puede_modificar = st.session_state['rol'] in ["Administrador", "Almacén"]
+    puede_modificar = st.session_state['rol'] in ["Administrador", "Recepción", "Almacén"]
 
     if puede_modificar:
         with st.expander("➕ Agregar Producto", expanded=False):
@@ -782,6 +761,7 @@ with tabs[2]:
                                 info_color = p_datos[color_seleccionado_ver]
                                 tallas_dict = info_color.get("tallas", {})
                                 
+                                # Renderizar tabla de inventario grid
                                 filas_grid = f"""
                                 <table class="inventory-grid-table">
                                     <tr>
@@ -807,54 +787,14 @@ with tabs[2]:
                                     else:
                                         st.caption("Sin imagen")
                     
-                    # Funcionalidad de edición exclusiva para Administrador y Almacén
                     if puede_modificar:
-                        edit_inv_key = f"edit_inv_mode_{p_id}"
-                        if edit_inv_key not in st.session_state:
-                            st.session_state[edit_inv_key] = False
-
-                        col_btn_edit, col_btn_del = st.columns(2)
-                        with col_btn_edit:
-                            if st.button(f"✏️ Editar Cantidades", key=f"btn_toggle_edit_inv_{p_id}"):
-                                st.session_state[edit_inv_key] = not st.session_state[edit_inv_key]
+                        if st.button(f"🗑️ Eliminar Producto", key=f"del_prod_{p_id}"):
+                            try:
+                                supabase.table("almacen").delete().eq("id", p_id).execute()
+                                st.success("Producto eliminado.")
                                 st.rerun()
-                        with col_btn_del:
-                            if st.button(f"🗑️ Eliminar Producto", key=f"del_prod_{p_id}"):
-                                try:
-                                    supabase.table("almacen").delete().eq("id", p_id).execute()
-                                    st.success("Producto eliminado.")
-                                    st.rerun()
-                                except Exception as ex:
-                                    st.error(f"Error al eliminar: {ex}")
-
-                        if st.session_state.get(edit_inv_key, False):
-                            st.markdown("---")
-                            st.markdown("#### ✏️ Modificar Cantidades por Talla")
-                            p_datos_mod = p_datos.copy()
-                            
-                            color_edit_sel = st.selectbox("Color a Modificar Stock", list(p_datos_mod.keys()), key=f"sel_color_edit_{p_id}")
-                            
-                            if color_edit_sel in p_datos_mod:
-                                tallas_actuales_color = p_datos_mod[color_edit_sel].get("tallas", {})
-                                nuevas_tallas_color = {}
-                                
-                                cols_edit_grid = st.columns(4)
-                                for idx_t, talla_s in enumerate(tallas_disponibles):
-                                    with cols_edit_grid[idx_t % 4]:
-                                        val_actual_t = tallas_actuales_color.get(talla_s, 0)
-                                        nv = st.number_input(f"Talla {talla_s}", min_value=0, value=int(val_actual_t), step=1, key=f"inv_edit_{p_id}_{color_edit_sel}_{talla_s}")
-                                        nuevas_tallas_color[talla_s] = int(nv)
-                                
-                                p_datos_mod[color_edit_sel]["tallas"] = nuevas_tallas_color
-                                
-                                if st.button("💾 Guardar Cambios de Stock", key=f"btn_save_inv_{p_id}"):
-                                    try:
-                                        supabase.table("almacen").update({"tallas_existencias": json.dumps(p_datos_mod)}).eq("id", p_id).execute()
-                                        st.session_state[edit_inv_key] = False
-                                        st.success("¡Cantidades actualizadas correctamente!")
-                                        st.rerun()
-                                    except Exception as err:
-                                        st.error(f"Error al actualizar stock: {err}")
+                            except Exception as ex:
+                                st.error(f"Error al eliminar: {ex}")
         else:
             st.caption("No hay productos registrados en el almacén.")
     except Exception as e:

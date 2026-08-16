@@ -160,6 +160,27 @@ st.markdown("""
         border: 1px solid #30363d;
     }
 
+    /* Tabla personalizada de tallas */
+    .sizes-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+        margin-bottom: 12px;
+        font-size: 0.88rem;
+    }
+    .sizes-table th {
+        background-color: rgba(88, 166, 255, 0.15);
+        color: #58a6ff;
+        border: 1px solid #30363d;
+        padding: 6px 10px;
+        text-align: left;
+    }
+    .sizes-table td {
+        border: 1px solid #30363d;
+        padding: 6px 10px;
+        color: #e6edf3;
+    }
+
     @media (min-width: 992px) {
         [data-testid="stImage"] img {
             max-height: 380px !important;
@@ -203,7 +224,7 @@ lista_estados = [
     "Producción - Transferencia Térmica", "Orden Detenida", "Orden Cancelada", "Orden Entregada"
 ]
 
-tallas_disponibles = ["2", "4", "6", "8", "10", "12", "14", "16", "S", "M", "WS", "WM", "L", "XL", "2XL"]
+tallas_disponibles = ["2", "4", "6", "8", "10", "12", "14", "16", "S", "M", "WS", "WM", "L", "XL", "2XL", "3XL"]
 
 FORMATOS_ORDEN = [
     "png", "jpg", "jpeg", "pdf", "emb", "dst", "ai", 
@@ -353,6 +374,7 @@ with tabs[0]:
                 estado_actual = o.get('estado', 'Pendiente')
                 historial_db = o.get('historial', "[]")
                 archivos_db = o.get('archivos', "[]")
+                tallas_db = o.get('tallas_detalle', "[]")
                 
                 with st.container(border=True):
                     col_res, col_act = st.columns([2.2, 1.8])
@@ -385,6 +407,46 @@ with tabs[0]:
                                 st.write(f"**Abono:** ${o.get('abono', 0)}")
                                 st.write(f"**Restante:** ${o.get('restante', 0)}")
                         
+                        # Visualización Desglosada de Tallas / Sizes
+                        st.markdown("👕 **Detalle de Tallas / Sizes:**")
+                        try:
+                            lista_tallas = json.loads(tallas_db) if isinstance(tallas_db, str) else tallas_db
+                            if lista_tallas and len(lista_tallas) > 0:
+                                rows_html = ""
+                                total_piezas = 0
+                                for item_t in lista_tallas:
+                                    sz = item_t.get("talla", "-")
+                                    cant = item_t.get("cantidad", 0)
+                                    obs = item_t.get("comentario", "-") or "-"
+                                    total_piezas += cant
+                                    rows_html += f"<tr><td><b>{sz}</b></td><td>{cant}</td><td>{obs}</td></tr>"
+                                
+                                table_html = f"""
+                                <table class="sizes-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Talla / Size</th>
+                                            <th>Cantidad</th>
+                                            <th>Comentario / Detalle</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {rows_html}
+                                        <tr style="background-color: rgba(255,255,255,0.05); font-weight: bold;">
+                                            <td>TOTAL PIEZAS</td>
+                                            <td>{total_piezas}</td>
+                                            <td>-</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                """
+                                st.markdown(table_html, unsafe_allow_html=True)
+                            else:
+                                st.caption("No hay desglose de tallas registrado.")
+                        except Exception:
+                            st.caption("No se registró información de tallas.")
+
+                        st.markdown("---")
                         # Visualización de Archivos Adjuntos
                         st.markdown("📎 **Archivos Adjuntos:**")
                         try:
@@ -446,6 +508,7 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("➕ Crear Nueva Orden")
     numero_auto = obtener_siguiente_numero_orden()
+    
     with st.form("form_crear_orden_completa"):
         col_c1, col_c2 = st.columns(2)
         with col_c1:
@@ -456,9 +519,36 @@ with tabs[1]:
             tipo_servicio = st.selectbox("Tipo de Servicio", ["Bordado", "DTF", "Sublimación", "Mixto"])
             fecha_entrega = st.date_input("Fecha Estimada de Entrega")
         
-        total_orden = st.number_input("Total ($)", min_value=0.0, step=100.0)
-        abono_orden = st.number_input("Abono / Anticipo ($)", min_value=0.0, step=100.0)
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            total_orden = st.number_input("TOTAL ($)", min_value=0.0, step=100.0)
+        with col_m2:
+            abono_orden = st.number_input("ABONO / ANTICIPO ($)", min_value=0.0, step=100.0)
         
+        st.markdown("---")
+        st.markdown("👕 **Selección e Información de Tallas / Sizes**")
+        tallas_seleccionadas = st.multiselect(
+            "Selecciona las Tallas / Sizes que llevará esta orden:",
+            options=tallas_disponibles,
+            placeholder="Elige una o más tallas..."
+        )
+        
+        dict_detalle_tallas = []
+        if tallas_seleccionadas:
+            st.caption("Especifique la cantidad y detalles/comentarios para cada talla seleccionada:")
+            for sz in tallas_seleccionadas:
+                c_cant, c_obs = st.columns([1, 2.5])
+                with c_cant:
+                    cant_sz = st.number_input(f"Cantidad Size {sz}", min_value=1, value=1, step=1, key=f"form_cant_sz_{sz}")
+                with c_obs:
+                    obs_sz = st.text_input(f"Comentario/Detalles Size {sz}", placeholder="Ej: Nombre Juan #10, manga corta...", key=f"form_obs_sz_{sz}")
+                dict_detalle_tallas.append({
+                    "talla": sz,
+                    "cantidad": int(cant_sz),
+                    "comentario": obs_sz.strip()
+                })
+        
+        st.markdown("---")
         archivos_subidos = st.file_uploader(
             "📁 Adjuntar Archivos (Múltiples formatos: PNG, JPG, PDF, EMB, DST, AI, PSD, ZIP, etc.)", 
             type=FORMATOS_ORDEN, 
@@ -466,7 +556,7 @@ with tabs[1]:
             key="uploader_archivos_orden"
         )
         
-        observaciones = st.text_area("Observaciones")
+        observaciones = st.text_area("Observaciones Generales")
         
         if st.form_submit_button("💾 Guardar Orden"):
             urls_archivos = []
@@ -493,6 +583,7 @@ with tabs[1]:
                 "abono": abono_orden,
                 "restante": total_orden - abono_orden,
                 "observaciones": observaciones,
+                "tallas_detalle": json.dumps(dict_detalle_tallas),
                 "archivos": json.dumps(urls_archivos),
                 "estado": "Pendiente",
                 "historial": historial_inicial

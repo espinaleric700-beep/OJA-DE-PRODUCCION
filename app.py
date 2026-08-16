@@ -76,9 +76,9 @@ st.markdown("""
     
     [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
 
-    /* Solución para evitar apertura accidental de selects al hacer scroll táctil */
-    select, [data-baseweb="select"] {
-        touch-action: pan-y;
+    /* Solución definitiva para evitar apertura accidental de selects y baseweb al hacer scroll táctil */
+    select, [data-baseweb="select"], [data-baseweb="select"] *, div[data-baseweb="select"] div {
+        touch-action: pan-y !important;
         -webkit-user-select: none;
         user-select: none;
     }

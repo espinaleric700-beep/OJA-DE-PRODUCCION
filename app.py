@@ -205,11 +205,17 @@ lista_estados = [
 
 tallas_disponibles = ["2", "4", "6", "8", "10", "12", "14", "16", "S", "M", "WS", "WM", "L", "XL", "2XL"]
 
+# Extensiones de archivos permitidas para diseños y documentos de orden
+FORMATOS_ORDEN = [
+    "png", "jpg", "jpeg", "pdf", "emb", "dst", "ai", 
+    "psd", "eps", "svg", "cdr", "zip", "rar", "7z", "txt", "docx"
+]
+
 def limpiar_nombre_archivo(nombre): return re.sub(r'[^a-zA-Z0-9_.-]', '_', nombre)
 
-def subir_a_supabase(file_bytes, file_name, bucket="disenos"):
+def subir_a_supabase(file_bytes, file_name, bucket="disenos", carpeta="almacen"):
     nombre_seguro = limpiar_nombre_archivo(file_name)
-    path = f"almacen/{datetime.now().strftime('%Y%m%d%H%M%S')}_{nombre_seguro}"
+    path = f"{carpeta}/{datetime.now().strftime('%Y%m%d%H%M%S')}_{nombre_seguro}"
     supabase.storage.from_(bucket).upload(path, file_bytes, {"content-type": "application/octet-stream", "upsert": "true"})
     return supabase.storage.from_(bucket).get_public_url(path)
 
@@ -347,6 +353,7 @@ with tabs[0]:
                 cliente_o = o.get('nombre_cliente', 'Sin cliente')
                 estado_actual = o.get('estado', 'Pendiente')
                 historial_db = o.get('historial', "[]")
+                archivos_db = o.get('archivos', "[]")
                 
                 with st.container(border=True):
                     col_res, col_act = st.columns([2.2, 1.8])
@@ -378,6 +385,22 @@ with tabs[0]:
                                 st.write(f"**Total:** ${o.get('total', 0)}")
                                 st.write(f"**Abono:** ${o.get('abono', 0)}")
                                 st.write(f"**Restante:** ${o.get('restante', 0)}")
+                        
+                        # Visualización de Archivos Adjuntos a la Orden
+                        st.markdown("📎 **Archivos Adjuntos:**")
+                        try:
+                            lista_archivos = json.loads(archivos_db) if isinstance(archivos_db, str) else archivos_db
+                            if lista_archivos:
+                                for idx_arch, item_file in enumerate(lista_archivos):
+                                    url_f = item_file.get("url", "") if isinstance(item_file, dict) else item_file
+                                    nom_f = item_file.get("nombre", f"Archivo {idx_arch+1}") if isinstance(item_file, dict) else f"Archivo {idx_arch+1}"
+                                    if url_f:
+                                        st.markdown(f"- 📄 [{nom_f}]({url_f})")
+                            else:
+                                st.caption("No se adjuntaron archivos en esta orden.")
+                        except Exception:
+                            st.caption("No hay archivos adjuntos.")
+
                         st.markdown("---")
                         st.markdown("📜 **Historial:**")
                         try:
@@ -404,23 +427,51 @@ with tabs[1]:
         with col_c2:
             tipo_servicio = st.selectbox("Tipo de Servicio", ["Bordado", "DTF", "Sublimación", "Mixto"])
             fecha_entrega = st.date_input("Fecha Estimada de Entrega")
+        
         total_orden = st.number_input("Total ($)", min_value=0.0, step=100.0)
         abono_orden = st.number_input("Abono / Anticipo ($)", min_value=0.0, step=100.0)
+        
+        # Subida múltiple de archivos de diferentes formatos
+        archivos_subidos = st.file_uploader(
+            "📁 Adjuntar Archivos (Múltiples formatos: PNG, JPG, PDF, EMB, DST, AI, PSD, ZIP, etc.)", 
+            type=FORMATOS_ORDEN, 
+            accept_multiple_files=True,
+            key="uploader_archivos_orden"
+        )
+        
         observaciones = st.text_area("Observaciones")
+        
         if st.form_submit_button("💾 Guardar Orden"):
+            # Procesar y subir múltiples archivos
+            urls_archivos = []
+            if archivos_subidos:
+                with st.spinner("Subiendo archivos..."):
+                    for arch in archivos_subidos:
+                        url_file = subir_a_supabase(arch.getvalue(), arch.name, bucket="disenos", carpeta="ordenes_archivos")
+                        urls_archivos.append({"nombre": arch.name, "url": url_file})
+
             historial_inicial = json.dumps([{
                 "usuario": st.session_state['usuario'], 
                 "de": "Inicio", 
                 "a": "Pendiente", 
                 "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }])
+            
             supabase.table("ordenes").insert({
-                "numero_orden": numero_auto, "nombre_cliente": nombre_cliente, "telefono": telefono_cliente,
-                "tipo_servicio": tipo_servicio, "fecha_entrega": str(fecha_entrega), "total": total_orden,
-                "abono": abono_orden, "restante": total_orden - abono_orden, "observaciones": observaciones,
-                "estado": "Pendiente", "historial": historial_inicial
+                "numero_orden": numero_auto,
+                "nombre_cliente": nombre_cliente,
+                "telefono": telefono_cliente,
+                "tipo_servicio": tipo_servicio,
+                "fecha_entrega": str(fecha_entrega),
+                "total": total_orden,
+                "abono": abono_orden,
+                "restante": total_orden - abono_orden,
+                "observaciones": observaciones,
+                "archivos": json.dumps(urls_archivos),
+                "estado": "Pendiente",
+                "historial": historial_inicial
             }).execute()
-            st.success("¡Orden creada!")
+            st.success("¡Orden creada correctamente!")
             st.rerun()
 
 # ==============================================================================

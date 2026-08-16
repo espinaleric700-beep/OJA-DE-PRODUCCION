@@ -145,9 +145,18 @@ st.markdown("""
         border: 1px solid #30363d;
     }
 
-    /* ==========================================================================
-       MEDIA QUERIES: AJUSTES ESPECÍFICOS PARA PC
-       ========================================================================== */
+    /* Estilo para las tarjetas de las órdenes */
+    div[data-testid="stVerticalBlock"] > div:has(div.order-card-marker) {
+        background-color: rgba(22, 27, 34, 0.75);
+        border: 1px solid #30363d;
+        border-left: 4px solid #58a6ff;
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    /* MEDIA QUERIES: PC VS MÓVIL */
     @media (min-width: 992px) {
         [data-testid="stImage"] img {
             max-height: 380px !important;
@@ -155,9 +164,6 @@ st.markdown("""
         }
     }
 
-    /* ==========================================================================
-       MEDIA QUERIES: AJUSTES ESPECÍFICOS PARA MÓVILES
-       ========================================================================== */
     @media (max-width: 768px) {
         .block-container {
             padding: 0.5rem 0.5rem 2rem 0.5rem !important;
@@ -173,7 +179,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Detectar ancho de la pantalla dinámicamente mediante JS
+# Detectar ancho de la pantalla dinámicamente
 ancho_pantalla = streamlit_js_eval(js_expressions='window.innerWidth', key='viewport_width')
 es_movil = (ancho_pantalla < 768) if ancho_pantalla is not None else False
 
@@ -322,7 +328,7 @@ st.markdown("---")
 tabs = st.tabs(["📋 Ver Órdenes", "➕ Nueva Orden", "📦 Almacén", "⚙️ Usuarios"])
 
 # ==============================================================================
-# TAB 1: VER ÓRDENES
+# TAB 1: VER ÓRDENES (TARJETAS VISUALMENTE SEPARADAS)
 # ==============================================================================
 with tabs[0]:
     st.subheader("📋 Listado de Órdenes")
@@ -343,42 +349,54 @@ with tabs[0]:
         
         if ordenes:
             for o in ordenes:
-                o_id = o.get("id"); numero_o = o.get('numero_orden', 'S/N'); cliente_o = o.get('nombre_cliente', 'Sin cliente'); estado_actual = o.get('estado', 'Pendiente'); historial_db = o.get('historial', "[]")
-                col_res, col_act = st.columns([2.2, 1.8])
-                with col_res: 
-                    badge_html = obtener_badge_estado(estado_actual)
-                    st.markdown(f"**Orden #{numero_o}** - {cliente_o} {badge_html}", unsafe_allow_html=True)
-                with col_act:
-                    cols_action = st.columns([2, 1])
-                    idx_actual = lista_estados.index(estado_actual) if estado_actual in lista_estados else 0
-                    with cols_action[0]: nuevo_estado_sel = st.selectbox("Cambiar", lista_estados, index=idx_actual, key=f"sel_quick_{o_id}", label_visibility="collapsed")
-                    with cols_action[1]:
-                        if st.button("Cambiar", key=f"btn_quick_{o_id}"):
-                            if nuevo_estado_sel != estado_actual:
-                                actualizar_estado_con_historial(o_id, estado_actual, nuevo_estado_sel, historial_db, st.session_state['usuario'])
-                                st.success("¡Actualizado!")
-                                st.rerun()
-                with st.expander("Ver detalles completos"):
-                    col_info1, col_info2 = st.columns(2)
-                    with col_info1:
-                        if st.session_state['rol'] in ["Administrador", "Recepción"]:
-                            st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
-                        st.write(f"**Fecha Entrega:** {o.get('fecha_entrega', 'N/D')}")
-                        st.write(f"**Servicio:** {o.get('tipo_servicio', 'N/D')}")
-                    with col_info2:
-                        if st.session_state['rol'] in ["Administrador", "Recepción"]:
-                            st.write(f"**Total:** ${o.get('total', 0)}")
-                            st.write(f"**Abono:** ${o.get('abono', 0)}")
-                            st.write(f"**Restante:** ${o.get('restante', 0)}")
-                    st.markdown("---")
-                    st.markdown("📜 **Historial:**")
-                    try:
-                        registros = json.loads(historial_db) if isinstance(historial_db, str) else historial_db
-                        if registros:
-                            for reg in registros[:5]:
-                                st.caption(f"🕒 {reg.get('fecha', '-')} | 👤 {reg.get('usuario', '-')}: {reg.get('de', '')} ➡️ {reg.get('a', '')}")
-                    except: st.caption("Sin historial.")
-                st.divider()
+                o_id = o.get("id")
+                numero_o = o.get('numero_orden', 'S/N')
+                cliente_o = o.get('nombre_cliente', 'Sin cliente')
+                estado_actual = o.get('estado', 'Pendiente')
+                historial_db = o.get('historial', "[]")
+                
+                # Tarjeta contenedora de la orden
+                with st.container():
+                    st.markdown('<div class="order-card-marker"></div>', unsafe_allow_html=True)
+                    col_res, col_act = st.columns([2.2, 1.8])
+                    with col_res: 
+                        badge_html = obtener_badge_estado(estado_actual)
+                        st.markdown(f"### Orden #{numero_o} - **{cliente_o}** {badge_html}", unsafe_allow_html=True)
+                    
+                    with col_act:
+                        cols_action = st.columns([2, 1])
+                        idx_actual = lista_estados.index(estado_actual) if estado_actual in lista_estados else 0
+                        with cols_action[0]: 
+                            nuevo_estado_sel = st.selectbox("Cambiar", lista_estados, index=idx_actual, key=f"sel_quick_{o_id}", label_visibility="collapsed")
+                        with cols_action[1]:
+                            if st.button("Cambiar", key=f"btn_quick_{o_id}"):
+                                if nuevo_estado_sel != estado_actual:
+                                    actualizar_estado_con_historial(o_id, estado_actual, nuevo_estado_sel, historial_db, st.session_state['usuario'])
+                                    st.success("¡Actualizado!")
+                                    st.rerun()
+                    
+                    with st.expander("📂 Ver detalles completos"):
+                        col_info1, col_info2 = st.columns(2)
+                        with col_info1:
+                            if st.session_state['rol'] in ["Administrador", "Recepción"]:
+                                st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
+                            st.write(f"**Fecha Entrega:** {o.get('fecha_entrega', 'N/D')}")
+                            st.write(f"**Servicio:** {o.get('tipo_servicio', 'N/D')}")
+                        with col_info2:
+                            if st.session_state['rol'] in ["Administrador", "Recepción"]:
+                                st.write(f"**Total:** ${o.get('total', 0)}")
+                                st.write(f"**Abono:** ${o.get('abono', 0)}")
+                                st.write(f"**Restante:** ${o.get('restante', 0)}")
+                        st.markdown("---")
+                        st.markdown("📜 **Historial:**")
+                        try:
+                            registros = json.loads(historial_db) if isinstance(historial_db, str) else historial_db
+                            if registros:
+                                for reg in registros[:5]:
+                                    st.caption(f"🕒 {reg.get('fecha', '-')} | 👤 {reg.get('usuario', '-')}: {reg.get('de', '')} ➡️ {reg.get('a', '')}")
+                        except: st.caption("Sin historial.")
+                
+                st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
         else: st.info("No hay órdenes encontradas.")
     except Exception as e: st.error(f"Error: {e}")
 
@@ -552,11 +570,7 @@ with tabs[2]:
                         
                         data_color = dict_colores.get(color_sel, {})
                         
-                        # ==========================================================
-                        # LÓGICA VISTA PC VS VISTA MÓVIL
-                        # ==========================================================
                         if es_movil:
-                            # VISTA MÓVIL: Imagen arriba, tallas abajo en 2 columnas
                             if data_color.get("imagen_url"): 
                                 st.image(data_color["imagen_url"], use_container_width=True)
                             else:
@@ -584,7 +598,6 @@ with tabs[2]:
                                     else:
                                         st.markdown(f"**Talla {talla}:** `{cantidad:02d}`")
                         else:
-                            # VISTA PC: Imagen a la izquierda, tallas a la derecha en 5 columnas
                             col_img, col_info = st.columns([1, 2], gap="large")
                             
                             with col_img:

@@ -1074,4 +1074,3 @@ with tabs[3]:
             st.error(f"❌ Error al consultar la tabla 'usuarios' en Supabase: {e}")
     else:
         st.warning("⚠️ No tienes permisos de Administrador para ver esta sección.")
-```[cite: 3]

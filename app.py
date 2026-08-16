@@ -516,26 +516,65 @@ with tabs[0]:
 
                         st.markdown("---")
                         st.markdown("📎 **Archivos Adjuntos:**")
+                        
+                        # Gestión para Agregar y Eliminar Archivos Adjuntos
                         try:
                             lista_archivos = json.loads(archivos_db) if isinstance(archivos_db, str) else archivos_db
-                            if lista_archivos:
-                                for idx_arch, item_file in enumerate(lista_archivos):
-                                    url_f = item_file.get("url", "") if isinstance(item_file, dict) else item_file
-                                    nom_f = item_file.get("nombre", f"Archivo {idx_arch+1}") if isinstance(item_file, dict) else f"Archivo {idx_arch+1}"
-                                    if url_f:
-                                        ext_archivo = nom_f.lower().split('.')[-1] if '.' in nom_f else ""
-                                        if ext_archivo in ["png", "jpg", "jpeg", "webp", "gif"]:
-                                            col_thumb, col_link = st.columns([1, 4])
-                                            with col_thumb:
-                                                st.image(url_f, width=70)
-                                            with col_link:
-                                                st.markdown(f"📄 [{nom_f}]({url_f})")
-                                        else:
-                                            st.markdown(f"- 📄 [{nom_f}]({url_f})")
-                            else:
-                                st.caption("No se adjuntaron archivos en esta orden.")
-                        except Exception:
-                            st.caption("No hay archivos adjuntos.")
+                            if not isinstance(lista_archivos, list):
+                                lista_archivos = []
+                        except:
+                            lista_archivos = []
+
+                        # Mostrar lista actual con opción de eliminar cada archivo
+                        if lista_archivos:
+                            for idx_arch, item_file in enumerate(lista_archivos):
+                                url_f = item_file.get("url", "") if isinstance(item_file, dict) else item_file
+                                nom_f = item_file.get("nombre", f"Archivo {idx_arch+1}") if isinstance(item_file, dict) else f"Archivo {idx_arch+1}"
+                                
+                                col_f_view, col_f_del = st.columns([5, 1])
+                                with col_f_view:
+                                    ext_archivo = nom_f.lower().split('.')[-1] if '.' in nom_f else ""
+                                    if ext_archivo in ["png", "jpg", "jpeg", "webp", "gif"]:
+                                        col_thumb, col_link = st.columns([1, 4])
+                                        with col_thumb:
+                                            st.image(url_f, width=70)
+                                        with col_link:
+                                            st.markdown(f"📄 [{nom_f}]({url_f})")
+                                    else:
+                                        st.markdown(f"- 📄 [{nom_f}]({url_f})")
+                                with col_f_del:
+                                    if st.button("🗑️", key=f"del_file_{o_id}_{idx_arch}", help=f"Eliminar {nom_f}"):
+                                        lista_archivos.pop(idx_arch)
+                                        try:
+                                            supabase.table("ordenes").update({"archivos": json.dumps(lista_archivos)}).eq("id", o_id).execute()
+                                            st.success(f"Archivo '{nom_f}' eliminado.")
+                                            st.rerun()
+                                        except Exception as err:
+                                            st.error(f"Error al eliminar archivo: {err}")
+                        else:
+                            st.caption("No se adjuntaron archivos en esta orden.")
+
+                        # Sección para agregar nuevos archivos a esta orden existente
+                        st.markdown("")
+                        nuevos_archivos_extras = st.file_uploader(
+                            "➕ Agregar más archivos a esta orden", 
+                            type=FORMATOS_ORDEN, 
+                            accept_multiple_files=True,
+                            key=f"uploader_add_more_{o_id}"
+                        )
+                        if nuevos_archivos_extras:
+                            if st.button("💾 Subir y Guardar Nuevos Archivos", key=f"btn_save_extras_{o_id}"):
+                                with st.spinner("Subiendo archivos adicionales..."):
+                                    try:
+                                        for arch in nuevos_archivos_extras:
+                                            url_file = subir_a_supabase(arch.getvalue(), arch.name, bucket="disenos", carpeta="ordenes_archivos")
+                                            lista_archivos.append({"nombre": arch.name, "url": url_file})
+                                        
+                                        supabase.table("ordenes").update({"archivos": json.dumps(lista_archivos)}).eq("id", o_id).execute()
+                                        st.success("¡Archivos agregados exitosamente!")
+                                        st.rerun()
+                                    except Exception as err:
+                                        st.error(f"Error al subir los archivos: {err}")
 
                         st.markdown("---")
                         st.markdown("📜 **Historial:**")
@@ -580,9 +619,7 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("➕ Crear Nueva Orden")
     
-    # Clave dinámica para resetear los inputs del formulario al guardar con éxito
     rc = st.session_state["form_reset_counter"]
-    
     numero_auto = obtener_siguiente_numero_orden()
     
     col_c1, col_c2 = st.columns(2)
@@ -610,7 +647,6 @@ with tabs[1]:
     
     observaciones = st.text_area("Observaciones Generales", key=f"area_obs_{rc}")
     
-    # Bloque de tallas dinámicas situado al final
     st.markdown("---")
     st.markdown("👕 **Selección e Información de Tallas / Sizes**")
     col_add_btn, col_clear_btn = st.columns([2, 1])
@@ -686,7 +722,6 @@ with tabs[1]:
                     "historial": historial_inicial
                 }).execute()
                 
-                # Restablecer formulario por completo y mostrar aviso de éxito
                 st.session_state["nueva_orden_tallas_dinamicas"] = [{"talla": "S", "cantidad": 1, "comentario": ""}]
                 st.session_state["form_reset_counter"] += 1
                 st.success("✅ ¡La orden se guardó correctamente y el formulario ha quedado limpio!")

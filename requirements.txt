@@ -3,4 +3,4 @@ supabase
 firebase-admin
 pandas
 streamlit-autorefresh
-supabase
+streamlit-js-eval

@@ -75,6 +75,13 @@ st.markdown("""
     }
     
     [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
+
+    /* Solución para evitar apertura accidental de selects al hacer scroll táctil */
+    select, [data-baseweb="select"] {
+        touch-action: pan-y;
+        -webkit-user-select: none;
+        user-select: none;
+    }
     
     .user-card {
         background-color: rgba(22, 27, 34, 0.85);

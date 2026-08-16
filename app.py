@@ -62,14 +62,15 @@ st.markdown("""
 if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 
 # ==============================================================================
-# LOGIN
+# LOGIN (Corregido para evitar errores por mayúsculas)
 # ==============================================================================
 if not st.session_state["autenticado"]:
     st.title("🔐 Acceso Pixel Thread")
     u = st.text_input("Usuario")
     p = st.text_input("Contraseña", type="password")
     if st.button("Ingresar"):
-        if u == "admin" and p == "2580Admin":
+        # Se usa .strip().lower() para aceptar 'Admin', 'ADMIN', 'admin', etc.
+        if u.strip().lower() == "admin" and p == "2580Admin":
             st.session_state.update({"autenticado": True, "usuario": "admin", "rol": "Administrador"})
             st.rerun()
         else:
@@ -97,7 +98,6 @@ with tabs[0]: # ÓRDENES
 with tabs[1]: # NUEVA ORDEN
     st.subheader("➕ Crear Orden")
     st.write(f"Siguiente número de orden sugerido: {obtener_siguiente_numero_orden()}")
-    # (Formulario de nueva orden)
     if st.button("Guardar Orden"): 
         st.success("Orden guardada.")
 
@@ -129,7 +129,6 @@ with tabs[2]: # ALMACÉN (EDICIÓN MANUAL)
                                     val_actual = int(dict_tallas.get(t, 0))
                                     nuevo_val = st.number_input(f"{t}", min_value=0, value=val_actual, key=f"input_{p_id}_{color_ver}_{t}")
                                     
-                                    # Si el valor cambió, actualiza directamente en DB y recarga
                                     if nuevo_val != val_actual:
                                         actualizar_talla_supabase(p_id, color_ver, t, nuevo_val, existencias)
                                         st.rerun() 

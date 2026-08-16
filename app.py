@@ -429,6 +429,7 @@ with tabs[0]:
                                 st.write(f"**Total:** ${o.get('total', 0)}")
                                 st.write(f"**Abono:** ${o.get('abono', 0)}")
                                 st.write(f"**Restante:** ${o.get('restante', 0)}")
+                            st.write(f"**Observaciones:** {o.get('observaciones', 'Ninguna')}")
                         
                         st.markdown("👕 **Detalle de Tallas / Sizes:**")
                         try:
@@ -732,7 +733,6 @@ with tabs[2]:
                                 "hex": col_data.get("hex", "#3b82f6")
                             }
                         
-                        # Inserción adaptada a la estructura de columnas de Supabase
                         supabase.table("almacen").insert({
                             "nombre_producto": inv_nombre.strip(),
                             "imagen_url": primera_imagen_url,

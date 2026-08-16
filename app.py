@@ -101,7 +101,6 @@ st.markdown("""
         border-color: #58a6ff !important;
     }
 
-    /* Estilos para las tarjetas contenedoras con borde */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: rgba(22, 27, 34, 0.75) !important;
         border: 1px solid #30363d !important;
@@ -112,7 +111,6 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
     }
 
-    /* Ajuste para imágenes PNG transparentes sobre el fondo oscuro de la app */
     [data-testid="stImage"] {
         display: flex;
         justify-content: center;
@@ -160,7 +158,6 @@ st.markdown("""
         border: 1px solid #30363d;
     }
 
-    /* Tabla personalizada de tallas */
     .sizes-table {
         width: 100%;
         border-collapse: collapse;
@@ -179,6 +176,32 @@ st.markdown("""
         border: 1px solid #30363d;
         padding: 6px 10px;
         color: #e6edf3;
+    }
+
+    /* Tabla compacta de inventario estilo rejilla */
+    .inventory-grid-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 6px;
+        margin-bottom: 6px;
+        font-size: 0.82rem;
+        text-align: center;
+    }
+    .inventory-grid-table th {
+        background-color: rgba(22, 27, 34, 0.95);
+        color: #8b949e;
+        border: 1px solid #30363d;
+        padding: 4px 6px;
+        font-weight: 600;
+    }
+    .inventory-grid-table td {
+        border: 1px solid #30363d;
+        padding: 6px 4px;
+        color: #3fb950;
+        background-color: rgba(15, 20, 28, 0.6);
+        font-family: monospace;
+        font-weight: bold;
+        font-size: 0.9rem;
     }
 
     @media (min-width: 992px) {
@@ -203,7 +226,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Detectar ancho de la pantalla dinámicamente
 ancho_pantalla = streamlit_js_eval(js_expressions='window.innerWidth', key='viewport_width')
 es_movil = (ancho_pantalla < 768) if ancho_pantalla is not None else False
 
@@ -407,7 +429,6 @@ with tabs[0]:
                                 st.write(f"**Abono:** ${o.get('abono', 0)}")
                                 st.write(f"**Restante:** ${o.get('restante', 0)}")
                         
-                        # Visualización Desglosada de Tallas / Sizes
                         st.markdown("👕 **Detalle de Tallas / Sizes:**")
                         try:
                             lista_tallas = json.loads(tallas_db) if isinstance(tallas_db, str) else tallas_db
@@ -447,7 +468,6 @@ with tabs[0]:
                             st.caption("No se registró información de tallas.")
 
                         st.markdown("---")
-                        # Visualización de Archivos Adjuntos
                         st.markdown("📎 **Archivos Adjuntos:**")
                         try:
                             lista_archivos = json.loads(archivos_db) if isinstance(archivos_db, str) else archivos_db
@@ -471,9 +491,6 @@ with tabs[0]:
                                     st.caption(f"🕒 {reg.get('fecha', '-')} | 👤 {reg.get('usuario', '-')}: {reg.get('de', '')} ➡️ {reg.get('a', '')}")
                         except: st.caption("Sin historial.")
 
-                        # ======================================================
-                        # OPCIÓN SOLO PARA ADMIN: ELIMINAR ORDEN
-                        # ======================================================
                         if st.session_state['rol'] == "Administrador":
                             st.markdown("---")
                             confirm_key = f"confirm_del_orden_{o_id}"
@@ -680,7 +697,7 @@ with tabs[2]:
                     except Exception as err:
                         st.error(f"Error al guardar producto: {err}")
 
-    # Catálogo e Inventario Existente
+    # Catálogo e Inventario Existente (Formato Tabla / Cuadrícula Compacta)
     st.markdown("### 📋 Productos en Inventario")
     try:
         productos = supabase.table("almacen").select("*").execute().data
@@ -695,18 +712,38 @@ with tabs[2]:
                     try:
                         existencias = json.loads(p_existencias_raw) if isinstance(p_existencias_raw, str) else p_existencias_raw
                         if isinstance(existencias, dict) and existencias:
-                            col_sel, col_img = st.columns([2, 1])
+                            col_sel, col_img = st.columns([2.5, 1])
                             with col_sel:
                                 color_ver = st.selectbox("Color", list(existencias.keys()), key=f"sel_prod_col_{p_id}")
                                 data_col = existencias.get(color_ver, {})
                                 dict_tallas = data_col.get("tallas", {})
                                 
-                                # Grilla de tallas
-                                cols_tallas = st.columns(4 if es_movil else 8)
-                                for idx_t, (t_nom, t_cant) in enumerate(dict_tallas.items()):
-                                    with cols_tallas[idx_t % len(cols_tallas)]:
-                                        st.caption(f"**{t_nom}**")
-                                        st.write(f"`{t_cant}`")
+                                # Construir tabla de cuadrícula para las tallas (similar a la imagen de referencia)
+                                headers_row1 = ""
+                                values_row1 = ""
+                                headers_row2 = ""
+                                values_row2 = ""
+                                
+                                primeras_tallas = ["2", "4", "6", "8", "10", "12", "14", "16"]
+                                segundas_tallas = ["S", "M", "WS", "WM", "L", "XL", "2XL", "3XL"]
+                                
+                                for t in primeras_tallas:
+                                    headers_row1 += f"<th>{t}</th>"
+                                    values_row1 += f"<td>{dict_tallas.get(t, 0)}</td>"
+                                    
+                                for t in segundas_tallas:
+                                    headers_row2 += f"<th>{t}</th>"
+                                    values_row2 += f"<td>{dict_tallas.get(t, 0)}</td>"
+                                    
+                                grid_table_html = f"""
+                                <table class="inventory-grid-table">
+                                    <tr>{headers_row1}</tr>
+                                    <tr>{values_row1}</tr>
+                                    <tr>{headers_row2}</tr>
+                                    <tr>{values_row2}</tr>
+                                </table>
+                                """
+                                st.markdown(grid_table_html, unsafe_allow_html=True)
                             
                             with col_img:
                                 img_c_url = data_col.get("imagen_url")

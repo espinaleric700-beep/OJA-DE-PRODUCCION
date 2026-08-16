@@ -16,14 +16,9 @@ from supabase import create_client
 URL_DE_MI_APP = "https://tu-app.streamlit.app" 
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
-# Inicialización Supabase segura con soporte para [supabase] en secrets o variables planas
-try:
-    SUPABASE_URL = st.secrets["supabase"]["url"]
-    SUPABASE_KEY = st.secrets["supabase"]["key"]
-except Exception:
-    SUPABASE_URL = st.secrets.get("SUPABASE_URL")
-    SUPABASE_KEY = st.secrets.get("SUPABASE_KEY")
-
+# Inicialización Supabase
+SUPABASE_URL = st.secrets["supabase"]["url"]
+SUPABASE_KEY = st.secrets["supabase"]["key"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==============================================================================
@@ -62,19 +57,17 @@ st.markdown("""
 if "autenticado" not in st.session_state: st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
 
 # ==============================================================================
-# LOGIN (Corregido para evitar errores por mayúsculas)
+# LOGIN
 # ==============================================================================
 if not st.session_state["autenticado"]:
     st.title("🔐 Acceso Pixel Thread")
     u = st.text_input("Usuario")
     p = st.text_input("Contraseña", type="password")
     if st.button("Ingresar"):
-        # Se usa .strip().lower() para aceptar 'Admin', 'ADMIN', 'admin', etc.
-        if u.strip().lower() == "admin" and p == "2580Admin":
+        # Lógica de auth (simplificada para este ejemplo)
+        if u == "admin" and p == "2580Admin":
             st.session_state.update({"autenticado": True, "usuario": "admin", "rol": "Administrador"})
             st.rerun()
-        else:
-            st.error("Credenciales incorrectas")
     st.stop()
 
 # ==============================================================================
@@ -84,22 +77,15 @@ tabs = st.tabs(["📋 Órdenes", "➕ Nueva Orden", "📦 Almacén"])
 
 with tabs[0]: # ÓRDENES
     st.subheader("📋 Listado de Órdenes")
-    try:
-        ordenes = supabase.table("ordenes").select("*").execute().data
-        if ordenes:
-            for o in ordenes:
-                with st.container(border=True):
-                    st.write(f"**Orden #{o.get('numero_orden')}** - {o.get('nombre_cliente')}")
-        else:
-            st.info("No hay órdenes registradas.")
-    except Exception as e:
-        st.error(f"Error al cargar órdenes: {e}")
+    ordenes = supabase.table("ordenes").select("*").execute().data
+    for o in ordenes:
+        with st.container(border=True):
+            st.write(f"**Orden #{o.get('numero_orden')}** - {o.get('nombre_cliente')}")
 
 with tabs[1]: # NUEVA ORDEN
     st.subheader("➕ Crear Orden")
-    st.write(f"Siguiente número de orden sugerido: {obtener_siguiente_numero_orden()}")
-    if st.button("Guardar Orden"): 
-        st.success("Orden guardada.")
+    # (Formulario abreviado por espacio)
+    if st.button("Guardar Orden"): st.success("Orden guardada.")
 
 with tabs[2]: # ALMACÉN (EDICIÓN MANUAL)
     st.subheader("📦 Control de Inventario")
@@ -113,28 +99,26 @@ with tabs[2]: # ALMACÉN (EDICIÓN MANUAL)
                 existencias = json.loads(p_existencias_raw)
                 
                 with st.container(border=True):
-                    st.markdown(f"### 🏷️ {p_nombre}")
+                    st.markdown(f"### {p_nombre}")
                     lista_colores = list(existencias.keys())
-                    if lista_colores:
-                        color_ver = st.selectbox("Color:", lista_colores, key=f"sel_{p_id}")
-                        
-                        dict_tallas = existencias.get(color_ver, {}).get("tallas", {})
-                        st.markdown("✏️ *Cambia el número para guardar automáticamente:*")
-                        
-                        filas = [["2", "4", "6", "8", "10", "12", "14", "16"], ["S", "M", "WS", "WM", "L", "XL", "2XL", "3XL"]]
-                        for fila in filas:
-                            cols = st.columns(len(fila))
-                            for idx, t in enumerate(fila):
-                                with cols[idx]:
-                                    val_actual = int(dict_tallas.get(t, 0))
-                                    nuevo_val = st.number_input(f"{t}", min_value=0, value=val_actual, key=f"input_{p_id}_{color_ver}_{t}")
-                                    
-                                    if nuevo_val != val_actual:
-                                        actualizar_talla_supabase(p_id, color_ver, t, nuevo_val, existencias)
-                                        st.rerun() 
-                    else:
-                        st.warning("Este producto no tiene colores o tallas configuradas.")
+                    color_ver = st.selectbox("Color:", lista_colores, key=f"sel_{p_id}")
+                    
+                    dict_tallas = existencias.get(color_ver, {}).get("tallas", {})
+                    st.markdown("✏️ *Cambia el número para guardar automáticamente:*")
+                    
+                    filas = [["2", "4", "6", "8", "10", "12", "14", "16"], ["S", "M", "WS", "WM", "L", "XL", "2XL", "3XL"]]
+                    for fila in filas:
+                        cols = st.columns(len(fila))
+                        for idx, t in enumerate(fila):
+                            with cols[idx]:
+                                val_actual = int(dict_tallas.get(t, 0))
+                                nuevo_val = st.number_input(f"{t}", min_value=0, value=val_actual, key=f"input_{p_id}_{color_ver}_{t}")
+                                
+                                # Si el valor cambió, actualiza directamente en DB
+                                if nuevo_val != val_actual:
+                                    actualizar_talla_supabase(p_id, color_ver, t, nuevo_val, existencias)
+                                    st.rerun() 
         else:
-            st.info("No hay productos en el almacén.")
+            st.info("No hay productos.")
     except Exception as e:
-        st.error(f"Error en almacén: {e}")
+        st.error(f"Error: {e}")

@@ -423,18 +423,69 @@ with tabs[0]:
                                     st.rerun()
                     
                     with st.expander("📂 Ver detalles completos"):
-                        col_info1, col_info2 = st.columns(2)
-                        with col_info1:
-                            if st.session_state['rol'] in ["Administrador", "Recepción"]:
-                                st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
-                            st.write(f"**Fecha Entrega:** {o.get('fecha_entrega', 'N/D')}")
-                            st.write(f"**Servicio:** {o.get('tipo_servicio', 'N/D')}")
-                        with col_info2:
-                            if st.session_state['rol'] in ["Administrador", "Recepción"]:
-                                st.write(f"**Total:** ${o.get('total', 0)}")
-                                st.write(f"**Abono:** ${o.get('abono', 0)}")
-                                st.write(f"**Restante:** ${o.get('restante', 0)}")
-                            st.write(f"**Observaciones:** {o.get('observaciones', 'Ninguna')}")
+                        # Botón para activar Edición Total de la Orden
+                        edit_order_mode_key = f"edit_order_full_mode_{o_id}"
+                        if edit_order_mode_key not in st.session_state:
+                            st.session_state[edit_order_mode_key] = False
+
+                        if st.session_state['rol'] in ["Administrador", "Recepción"]:
+                            if st.button("✏️ Editar Orden Completa", key=f"btn_toggle_edit_order_{o_id}"):
+                                st.session_state[edit_order_mode_key] = not st.session_state[edit_order_mode_key]
+                                st.rerun()
+
+                        if st.session_state[edit_order_mode_key]:
+                            st.info("Modo de edición completa de orden activo:")
+                            with st.form(key=f"form_edit_full_order_{o_id}"):
+                                edit_nombre_orden = st.text_input("Nombre / Referencia de la Orden", value=str(o.get('nombre_orden', '')))
+                                edit_nombre_cliente = st.text_input("Nombre del Cliente", value=str(o.get('nombre_cliente', '')))
+                                edit_telefono = st.text_input("Teléfono", value=str(o.get('telefono', '')))
+                                
+                                serv_actual = o.get('tipo_servicio', 'Bordado')
+                                idx_serv = ["Bordado", "DTF", "Sublimación", "Mixto"].index(serv_actual) if serv_actual in ["Bordado", "DTF", "Sublimación", "Mixto"] else 0
+                                edit_tipo_servicio = st.selectbox("Tipo de Servicio", ["Bordado", "DTF", "Sublimación", "Mixto"], index=idx_serv)
+                                
+                                try:
+                                    fecha_val_parsed = datetime.strptime(str(o.get('fecha_entrega', '')), "%Y-%m-%d").date()
+                                except:
+                                    fecha_val_parsed = datetime.now().date()
+                                edit_fecha_entrega = st.date_input("Fecha Estimada de Entrega", value=fecha_val_parsed)
+                                
+                                edit_total = st.number_input("TOTAL ($)", min_value=0.0, step=100.0, value=float(o.get('total', 0.0)))
+                                edit_abono = st.number_input("ABONO / ANTICIPO ($)", min_value=0.0, step=100.0, value=float(o.get('abono', 0.0)))
+                                edit_observaciones = st.text_area("Observaciones Generales", value=str(o.get('observaciones', '')))
+                                
+                                if st.form_submit_button("💾 Guardar Cambios de la Orden"):
+                                    try:
+                                        supabase.table("ordenes").update({
+                                            "nombre_orden": edit_nombre_orden.strip(),
+                                            "nombre_cliente": edit_nombre_cliente.strip(),
+                                            "telefono": edit_telefono.strip(),
+                                            "tipo_servicio": edit_tipo_servicio,
+                                            "fecha_entrega": str(edit_fecha_entrega),
+                                            "total": edit_total,
+                                            "abono": edit_abono,
+                                            "restante": edit_total - edit_abono,
+                                            "observaciones": edit_observaciones
+                                        }).eq("id", o_id).execute()
+                                        
+                                        st.session_state[edit_order_mode_key] = False
+                                        st.success("¡Orden actualizada con éxito!")
+                                        st.rerun()
+                                    except Exception as err:
+                                        st.error(f"Error al actualizar la orden: {err}")
+                        else:
+                            col_info1, col_info2 = st.columns(2)
+                            with col_info1:
+                                if st.session_state['rol'] in ["Administrador", "Recepción"]:
+                                    st.write(f"**Teléfono:** {o.get('telefono', 'N/D')}")
+                                st.write(f"**Fecha Entrega:** {o.get('fecha_entrega', 'N/D')}")
+                                st.write(f"**Servicio:** {o.get('tipo_servicio', 'N/D')}")
+                            with col_info2:
+                                if st.session_state['rol'] in ["Administrador", "Recepción"]:
+                                    st.write(f"**Total:** ${o.get('total', 0)}")
+                                    st.write(f"**Abono:** ${o.get('abono', 0)}")
+                                    st.write(f"**Restante:** ${o.get('restante', 0)}")
+                                st.write(f"**Observaciones:** {o.get('observaciones', 'Ninguna')}")
                         
                         st.markdown("👕 **Detalle de Tallas / Sizes:**")
                         try:
@@ -517,7 +568,6 @@ with tabs[0]:
                         st.markdown("---")
                         st.markdown("📎 **Archivos Adjuntos:**")
                         
-                        # Gestión para Agregar y Eliminar Archivos Adjuntos
                         try:
                             lista_archivos = json.loads(archivos_db) if isinstance(archivos_db, str) else archivos_db
                             if not isinstance(lista_archivos, list):
@@ -525,7 +575,6 @@ with tabs[0]:
                         except:
                             lista_archivos = []
 
-                        # Mostrar lista actual con opción de eliminar cada archivo
                         if lista_archivos:
                             for idx_arch, item_file in enumerate(lista_archivos):
                                 url_f = item_file.get("url", "") if isinstance(item_file, dict) else item_file
@@ -554,7 +603,6 @@ with tabs[0]:
                         else:
                             st.caption("No se adjuntaron archivos en esta orden.")
 
-                        # Sección para agregar nuevos archivos a esta orden existente
                         st.markdown("")
                         nuevos_archivos_extras = st.file_uploader(
                             "➕ Agregar más archivos a esta orden", 
@@ -840,38 +888,92 @@ with tabs[2]:
                     col_p_info, col_p_img = st.columns([3, 1])
                     with col_p_info:
                         st.markdown(f"### {p_nombre}")
-                        if p_datos:
-                            colores_disponibles_list = list(p_datos.keys())
-                            color_seleccionado_ver = st.selectbox("Color", colores_disponibles_list, key=f"sel_ver_color_{p_id}")
-                            
-                            if color_seleccionado_ver in p_datos:
-                                info_color = p_datos[color_seleccionado_ver]
-                                tallas_dict = info_color.get("tallas", {})
+                        
+                        # Opción de edición total del producto en inventario
+                        edit_prod_mode_key = f"edit_prod_mode_{p_id}"
+                        if edit_prod_mode_key not in st.session_state:
+                            st.session_state[edit_prod_mode_key] = False
+
+                        if puede_modificar:
+                            if st.button("✏️ Editar Producto Completo", key=f"btn_toggle_edit_prod_{p_id}"):
+                                st.session_state[edit_prod_mode_key] = not st.session_state[edit_prod_mode_key]
+                                st.rerun()
+
+                        if st.session_state[edit_prod_mode_key]:
+                            st.info("Modo de edición de producto activo:")
+                            with st.form(key=f"form_edit_prod_{p_id}"):
+                                edit_p_nombre = st.text_input("Nombre del Producto", value=str(p_nombre))
                                 
-                                filas_grid = f"""
-                                <table class="inventory-grid-table">
-                                    <tr>
-                                        {''.join([f"<th>{t}</th>" for t in tallas_disponibles[:8]])}
-                                    </tr>
-                                    <tr>
-                                        {''.join([f"<td>{tallas_dict.get(t, 0)}</td>" for t in tallas_disponibles[:8]])}
-                                    </tr>
-                                    <tr>
-                                        {''.join([f"<th>{t}</th>" for t in tallas_disponibles[8:]])}
-                                    </tr>
-                                    <tr>
-                                        {''.join([f"<td>{tallas_dict.get(t, 0)}</td>" for t in tallas_disponibles[8:]])}
-                                    </tr>
-                                </table>
-                                """
-                                st.markdown(filas_grid, unsafe_allow_html=True)
+                                st.markdown("#### Editar Existencias por Color y Tallas:")
+                                temp_edit_datos = {}
                                 
-                                img_url_color = info_color.get("imagen_url", "") or prod.get("imagen_url", "")
-                                with col_p_img:
-                                    if img_url_color:
-                                        st.image(img_url_color, use_container_width=True)
-                                    else:
-                                        st.caption("Sin imagen")
+                                # Manejaremos la estructura de colores actual
+                                colores_keys_actuales = list(p_datos.keys()) if isinstance(p_datos, dict) else []
+                                
+                                for c_k in colores_keys_actuales:
+                                    st.markdown(f"🔹 **Color: {c_k}**")
+                                    tallas_actuales_color = p_datos[c_k].get("tallas", {})
+                                    img_url_actual = p_datos[c_k].get("imagen_url", "")
+                                    hex_actual = p_datos[c_k].get("hex", "#3b82f6")
+                                    
+                                    cols_t_edit = st.columns(4)
+                                    nuevas_tallas_col = {}
+                                    for idx_t, t_s in enumerate(tallas_disponibles):
+                                        val_t_prev = tallas_actuales_color.get(t_s, 0)
+                                        with cols_t_edit[idx_t % 4]:
+                                            nuevas_tallas_col[t_s] = st.number_input(f"Talla {t_s} ({c_k})", min_value=0, step=1, value=int(val_t_prev), key=f"edit_inv_t_{p_id}_{c_k}_{t_s}")
+                                    
+                                    temp_edit_datos[c_k] = {
+                                        "tallas": nuevas_tallas_col,
+                                        "imagen_url": img_url_actual,
+                                        "hex": hex_actual
+                                    }
+
+                                if st.form_submit_button("💾 Guardar Cambios del Producto"):
+                                    try:
+                                        supabase.table("almacen").update({
+                                            "nombre_producto": edit_p_nombre.strip(),
+                                            "tallas_existencias": json.dumps(temp_edit_datos)
+                                        }).eq("id", p_id).execute()
+                                        
+                                        st.session_state[edit_prod_mode_key] = False
+                                        st.success("¡Producto actualizado exitosamente!")
+                                        st.rerun()
+                                    except Exception as err:
+                                        st.error(f"Error al actualizar producto: {err}")
+                        else:
+                            if p_datos:
+                                colores_disponibles_list = list(p_datos.keys())
+                                color_seleccionado_ver = st.selectbox("Color", colores_disponibles_list, key=f"sel_ver_color_{p_id}")
+                                
+                                if color_seleccionado_ver in p_datos:
+                                    info_color = p_datos[color_seleccionado_ver]
+                                    tallas_dict = info_color.get("tallas", {})
+                                    
+                                    filas_grid = f"""
+                                    <table class="inventory-grid-table">
+                                        <tr>
+                                            {''.join([f"<th>{t}</th>" for t in tallas_disponibles[:8]])}
+                                        </tr>
+                                        <tr>
+                                            {''.join([f"<td>{tallas_dict.get(t, 0)}</td>" for t in tallas_disponibles[:8]])}
+                                        </tr>
+                                        <tr>
+                                            {''.join([f"<th>{t}</th>" for t in tallas_disponibles[8:]])}
+                                        </tr>
+                                        <tr>
+                                            {''.join([f"<td>{tallas_dict.get(t, 0)}</td>" for t in tallas_disponibles[8:]])}
+                                        </tr>
+                                    </table>
+                                    """
+                                    st.markdown(filas_grid, unsafe_allow_html=True)
+                                    
+                                    img_url_color = info_color.get("imagen_url", "") or prod.get("imagen_url", "")
+                                    with col_p_img:
+                                        if img_url_color:
+                                            st.image(img_url_color, use_container_width=True)
+                                        else:
+                                            st.caption("Sin imagen")
                     
                     if puede_modificar:
                         if st.button(f"🗑️ Eliminar Producto", key=f"del_prod_{p_id}"):
@@ -920,19 +1022,52 @@ with tabs[3]:
                 for usr in res_u.data:
                     u_id = usr.get("id")
                     u_n = usr.get("usuario")
+                    u_p = usr.get("password")
                     u_r = usr.get("rol_id")
                     
-                    col_u1, col_u2 = st.columns([3, 1])
-                    with col_u1:
-                        st.write(f"👤 **{u_n}** — Rol: *{u_r}*")
-                    with col_u2:
-                        if u_n.lower() != "admin":
-                            if st.button("🗑️ Eliminar", key=f"del_user_{u_id}"):
-                                try:
-                                    supabase.table("usuarios").delete().eq("id", u_id).execute()
-                                    st.rerun()
-                                except Exception as err:
-                                    st.error(f"Error al eliminar usuario: {err}")
+                    with st.container(border=True):
+                        col_u1, col_u2 = st.columns([3, 1])
+                        with col_u1:
+                            st.write(f"👤 **{u_n}** — Rol: *{u_r}*")
+                        with col_u2:
+                            if u_n.lower() != "admin":
+                                if st.button("🗑️ Eliminar", key=f"del_user_{u_id}"):
+                                    try:
+                                        supabase.table("usuarios").delete().eq("id", u_id).execute()
+                                        st.rerun()
+                                    except Exception as err:
+                                        st.error(f"Error al eliminar usuario: {err}")
+
+                        # Botón para editar usuario de manera total
+                        edit_user_mode_key = f"edit_user_mode_{u_id}"
+                        if edit_user_mode_key not in st.session_state:
+                            st.session_state[edit_user_mode_key] = False
+
+                        if st.button("✏️ Editar Usuario", key=f"btn_toggle_edit_user_{u_id}"):
+                            st.session_state[edit_user_mode_key] = not st.session_state[edit_user_mode_key]
+                            st.rerun()
+
+                        if st.session_state[edit_user_mode_key]:
+                            with st.form(key=f"form_edit_user_{u_id}"):
+                                edit_u_nombre = st.text_input("Nombre de Usuario", value=str(u_n))
+                                edit_u_pass = st.text_input("Contraseña", value=str(u_p), type="password")
+                                
+                                idx_rol = roles_disponibles.index(u_r) if u_r in roles_disponibles else 0
+                                edit_u_rol = st.selectbox("Rol del Usuario", roles_disponibles, index=idx_rol)
+                                
+                                if st.form_submit_button("💾 Guardar Cambios de Usuario"):
+                                    try:
+                                        supabase.table("usuarios").update({
+                                            "usuario": edit_u_nombre.strip(),
+                                            "password": edit_u_pass.strip(),
+                                            "rol_id": edit_u_rol
+                                        }).eq("id", u_id).execute()
+                                        
+                                        st.session_state[edit_user_mode_key] = False
+                                        st.success("¡Usuario actualizado correctamente!")
+                                        st.rerun()
+                                    except Exception as err:
+                                        st.error(f"Error al actualizar usuario: {err}")
             else:
                 st.caption("No hay usuarios adicionales registrados.")
         except Exception as e:

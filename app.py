@@ -286,7 +286,7 @@ def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, histori
         elif isinstance(historial_actual, list): lista_historial = historial_actual
     lista_historial.insert(0, nuevo_registro)
     try:
-        supabase.table("ordenes").update({"estado": nuevo_estado, "historial": json.dumps(lista_historial)}).eq("id", o_id).execute()
+        supabase.table("ordenes").update({"estado_actual": nuevo_estado, "historial": json.dumps(lista_historial)}).eq("id", o_id).execute()
     except Exception as e:
         st.error(f"Error actualizando estado en Supabase: {e}")
 
@@ -382,7 +382,7 @@ with tabs[0]:
     
     try:
         query_ordenes = supabase.table("ordenes").select("*")
-        if filtro_estado != "Todos": query_ordenes = query_ordenes.eq("estado", filtro_estado)
+        if filtro_estado != "Todos": query_ordenes = query_ordenes.eq("estado_actual", filtro_estado)
         ordenes = query_ordenes.execute().data
         
         if busqueda:
@@ -394,7 +394,7 @@ with tabs[0]:
                 o_id = o.get("id")
                 numero_o = o.get('nombre_orden', 'S/N')
                 cliente_o = o.get('nombre_cliente', 'Sin cliente')
-                estado_actual = o.get('estado', 'Pendiente')
+                estado_actual = o.get('estado_actual', 'Pendiente')
                 historial_db = o.get('historial', "[]")
                 archivos_db = o.get('archivos', "[]")
                 tallas_db = o.get('tallas_detalle', "[]")
@@ -645,7 +645,7 @@ with tabs[1]:
                     "observaciones": observaciones,
                     "tallas_detalle": json.dumps(dict_detalle_tallas),
                     "archivos": json.dumps(urls_archivos),
-                    "estado": "Pendiente",
+                    "estado_actual": "Pendiente",
                     "historial": historial_inicial
                 }).execute()
                 st.success("¡Orden creada correctamente!")

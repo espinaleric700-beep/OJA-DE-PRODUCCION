@@ -90,15 +90,15 @@ st.markdown("""
         border-color: #58a6ff !important;
     }
 
-    /* Imagen general */
+    /* Imagen general con fondo transparente */
     [data-testid="stImage"] {
         display: flex;
         justify-content: center;
         align-items: center;
-        background: #ffffff;
-        border-radius: 12px;
-        padding: 10px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        background: transparent !important;
+        border-radius: 0px !important;
+        padding: 0px !important;
+        box-shadow: none !important;
     }
 
     /* Estilos de inputs de Tallas */
@@ -422,7 +422,6 @@ with tabs[2]:
                 
                 if color_activo:
                     st.markdown(f"📏 **Tallas para `{color_activo}`**")
-                    # Ajuste de columnas para creación
                     cols_grid = st.columns(2 if es_movil else 5)
                     num_cols = len(cols_grid)
                     for idx, talla in enumerate(tallas_disponibles):

@@ -432,7 +432,6 @@ with tabs[0]:
                         try:
                             lista_tallas = json.loads(tallas_db) if isinstance(tallas_db, str) else tallas_db
                             
-                            # Botón de activación para editar tallas manualmente
                             edit_mode_key = f"edit_tallas_mode_{o_id}"
                             if edit_mode_key not in st.session_state:
                                 st.session_state[edit_mode_key] = False
@@ -444,11 +443,8 @@ with tabs[0]:
 
                             if st.session_state[edit_mode_key]:
                                 st.info("Modo de edición manual activo:")
-                                nuevo_detalle_tallas = []
                                 with st.form(key=f"form_edit_tallas_{o_id}"):
-                                    # Asegurarnos de tener una estructura base editable con las tallas disponibles o las existentes
                                     tallas_existentes_map = {item.get("talla"): item for item in (lista_tallas if isinstance(lista_tallas, list) else [])}
-                                    
                                     tallas_a_editar = st.multiselect("Seleccionar Tallas", options=tallas_disponibles, default=list(tallas_existentes_map.keys()), key=f"ms_edit_{o_id}")
                                     
                                     temp_tallas_actualizadas = []
@@ -761,7 +757,6 @@ with tabs[2]:
                                 info_color = p_datos[color_seleccionado_ver]
                                 tallas_dict = info_color.get("tallas", {})
                                 
-                                # Renderizar tabla de inventario grid
                                 filas_grid = f"""
                                 <table class="inventory-grid-table">
                                     <tr>
@@ -798,7 +793,7 @@ with tabs[2]:
         else:
             st.caption("No hay productos registrados en el almacén.")
     except Exception as e:
-        st.error(f"Error al cargar almacén: {e}")
+        st.error(f"⚠️ **Error al cargar el almacén:** Asegúrate de que la tabla **`almacen`** existe en tu base de datos de Supabase.\n\nDetalle: {e}")
 
 # ==============================================================================
 # TAB 4: USUARIOS

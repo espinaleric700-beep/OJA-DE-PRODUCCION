@@ -249,7 +249,8 @@ roles_disponibles = [
 lista_estados = [
     "Pendiente", "Recepción", "Diseño Gráfico", "Digitalización de Bordados",
     "Preparar para imprimir", "Producción - Bordados", "Producción - Impresión", 
-    "Producción - Transferencia Térmica", "Orden Detenida", "Orden Cancelada", "Orden Entregada"
+    "Producción - Transferencia Térmica", "Recepción orden completada", 
+    "Orden Detenida", "Orden Cancelada", "Orden Entregada"
 ]
 
 tallas_disponibles = ["2", "4", "6", "8", "10", "12", "14", "16", "S", "M", "WS", "WM", "L", "XL", "2XL", "3XL"]
@@ -308,6 +309,7 @@ def obtener_badge_estado(estado, tipo_servicio=""):
         "Producción - Bordados": ("#bc8cff", "rgba(188, 140, 255, 0.15)"),
         "Producción - Impresión": ("#36a3f7", "rgba(54, 163, 247, 0.15)"),
         "Producción - Transferencia Térmica": ("#f0883e", "rgba(240, 136, 62, 0.15)"),
+        "Recepción orden completada": ("#3fb950", "rgba(63, 185, 80, 0.2)"),
         "Orden Detenida": ("#d29922", "rgba(210, 153, 34, 0.15)"),
         "Orden Cancelada": ("#f85149", "rgba(248, 81, 73, 0.15)"),
         "Orden Entregada": ("#3fb950", "rgba(63, 185, 80, 0.15)")

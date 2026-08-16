@@ -240,7 +240,8 @@ roles_disponibles = [
 ]
 
 lista_estados = [
-    "Pendiente", "Recepción", "Producción - Bordados", "Producción - Impresión", 
+    "Pendiente", "Recepción", "Diseño Gráfico", "Digitalización de Bordados",
+    "Producción - Bordados", "Producción - Impresión", 
     "Producción - Transferencia Térmica", "Orden Detenida", "Orden Cancelada", "Orden Entregada"
 ]
 
@@ -294,6 +295,8 @@ def obtener_badge_estado(estado):
     colores = {
         "Pendiente": ("#e3b341", "rgba(227, 179, 65, 0.15)"),
         "Recepción": ("#58a6ff", "rgba(88, 166, 255, 0.15)"),
+        "Diseño Gráfico": ("#38bdf8", "rgba(56, 189, 248, 0.15)"),
+        "Digitalización de Bordados": ("#f472b6", "rgba(244, 114, 182, 0.15)"),
         "Producción - Bordados": ("#bc8cff", "rgba(188, 140, 255, 0.15)"),
         "Producción - Impresión": ("#36a3f7", "rgba(54, 163, 247, 0.15)"),
         "Producción - Transferencia Térmica": ("#f0883e", "rgba(240, 136, 62, 0.15)"),

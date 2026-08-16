@@ -131,31 +131,23 @@ st.markdown("""
         background: rgba(22, 27, 34, 0.85);
         border: 1px solid #30363d;
         border-radius: 8px;
-        padding: 4px 6px;
-        margin-bottom: 4px;
+        padding: 2px 4px;
+        margin-bottom: 2px;
     }
     div[data-testid="stNumberInput"] label {
-        font-size: 0.75rem !important;
+        font-size: 0.68rem !important;
         color: #8b949e !important;
         font-weight: 700;
         text-transform: uppercase;
     }
     div[data-testid="stNumberInput"] input {
-        height: 32px !important;
-        font-size: 0.88rem !important;
+        height: 28px !important;
+        font-size: 0.85rem !important;
         background-color: transparent !important;
-        color: #ffffff !important;
+        color: #3fb950 !important;
         text-align: center;
         border: none !important;
-    }
-
-    div[data-testid="stRadio"] > div {
-        gap: 8px !important;
-        flex-wrap: wrap !important;
-        background: rgba(22, 27, 34, 0.85);
-        padding: 8px 12px;
-        border-radius: 8px;
-        border: 1px solid #30363d;
+        font-weight: bold;
     }
 
     .sizes-table {
@@ -178,32 +170,6 @@ st.markdown("""
         color: #e6edf3;
     }
 
-    /* Tabla compacta de inventario estilo rejilla */
-    .inventory-grid-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 6px;
-        margin-bottom: 6px;
-        font-size: 0.82rem;
-        text-align: center;
-    }
-    .inventory-grid-table th {
-        background-color: rgba(22, 27, 34, 0.95);
-        color: #8b949e;
-        border: 1px solid #30363d;
-        padding: 4px 6px;
-        font-weight: 600;
-    }
-    .inventory-grid-table td {
-        border: 1px solid #30363d;
-        padding: 6px 4px;
-        color: #3fb950;
-        background-color: rgba(15, 20, 28, 0.6);
-        font-family: monospace;
-        font-weight: bold;
-        font-size: 0.9rem;
-    }
-
     @media (min-width: 992px) {
         [data-testid="stImage"] img {
             max-height: 380px !important;
@@ -218,9 +184,6 @@ st.markdown("""
         [data-testid="stImage"] img {
             max-height: 210px !important;
             object-fit: contain !important;
-        }
-        div[data-testid="stRadio"] > div {
-            padding: 6px 8px;
         }
     }
     </style>
@@ -697,7 +660,7 @@ with tabs[2]:
                     except Exception as err:
                         st.error(f"Error al guardar producto: {err}")
 
-    # Catálogo e Inventario Existente (Formato Tabla / Cuadrícula Compacta)
+    # Catálogo e Inventario Existente con Opción de Edición Interactiva por Talla
     st.markdown("### 📋 Productos en Inventario")
     try:
         productos = supabase.table("almacen").select("*").execute().data
@@ -712,39 +675,47 @@ with tabs[2]:
                     try:
                         existencias = json.loads(p_existencias_raw) if isinstance(p_existencias_raw, str) else p_existencias_raw
                         if isinstance(existencias, dict) and existencias:
-                            col_sel, col_img = st.columns([2.5, 1])
+                            col_sel, col_img = st.columns([2.8, 1])
                             with col_sel:
-                                color_ver = st.selectbox("Color", list(existencias.keys()), key=f"sel_prod_col_{p_id}")
+                                lista_colores_prod = list(existencias.keys())
+                                color_ver = st.selectbox("Color", lista_colores_prod, key=f"sel_prod_col_{p_id}")
                                 data_col = existencias.get(color_ver, {})
                                 dict_tallas = data_col.get("tallas", {})
                                 
-                                # Construir tabla de cuadrícula para las tallas (similar a la imagen de referencia)
-                                headers_row1 = ""
-                                values_row1 = ""
-                                headers_row2 = ""
-                                values_row2 = ""
+                                st.markdown("✏️ **Editar Cantidades por Talla:**")
                                 
+                                # Fila 1 de tallas (2 a 16)
                                 primeras_tallas = ["2", "4", "6", "8", "10", "12", "14", "16"]
-                                segundas_tallas = ["S", "M", "WS", "WM", "L", "XL", "2XL", "3XL"]
+                                cols_f1 = st.columns(len(primeras_tallas))
+                                nuevas_tallas_valores = dict_tallas.copy()
                                 
-                                for t in primeras_tallas:
-                                    headers_row1 += f"<th>{t}</th>"
-                                    values_row1 += f"<td>{dict_tallas.get(t, 0)}</td>"
-                                    
-                                for t in segundas_tallas:
-                                    headers_row2 += f"<th>{t}</th>"
-                                    values_row2 += f"<td>{dict_tallas.get(t, 0)}</td>"
-                                    
-                                grid_table_html = f"""
-                                <table class="inventory-grid-table">
-                                    <tr>{headers_row1}</tr>
-                                    <tr>{values_row1}</tr>
-                                    <tr>{headers_row2}</tr>
-                                    <tr>{values_row2}</tr>
-                                </table>
-                                """
-                                st.markdown(grid_table_html, unsafe_allow_html=True)
-                            
+                                for idx_t, t in enumerate(primeras_tallas):
+                                    with cols_f1[idx_t]:
+                                        val_actual = int(dict_tallas.get(t, 0))
+                                        nuevo_val_t = st.number_input(f"{t}", min_value=0, step=1, value=val_actual, key=f"edit_inv_{p_id}_{color_ver}_{t}")
+                                        nuevas_tallas_valores[t] = int(nuevo_val_t)
+                                        
+                                # Fila 2 de tallas (S a 3XL)
+                                segundas_tallas = ["S", "M", "WS", "WM", "L", "XL", "2XL", "3XL"]
+                                cols_f2 = st.columns(len(segundas_tallas))
+                                
+                                for idx_t, t in enumerate(segundas_tallas):
+                                    with cols_f2[idx_t]:
+                                        val_actual = int(dict_tallas.get(t, 0))
+                                        nuevo_val_t = st.number_input(f"{t}", min_value=0, step=1, value=val_actual, key=f"edit_inv_{p_id}_{color_ver}_{t}")
+                                        nuevas_tallas_valores[t] = int(nuevo_val_t)
+                                        
+                                if st.button(f"💾 Guardar Cambios de `{color_ver}`", key=f"btn_save_inv_{p_id}_{color_ver}"):
+                                    try:
+                                        existencias[color_ver]["tallas"] = nuevas_tallas_valores
+                                        supabase.table("almacen").update({
+                                            "tallas_existencias": json.dumps(existencias)
+                                        }).eq("id", p_id).execute()
+                                        st.success(f"¡Existencias de {color_ver} actualizadas correctamente!")
+                                        st.rerun()
+                                    except Exception as err_upd:
+                                        st.error(f"Error al actualizar inventario: {err_upd}")
+                                        
                             with col_img:
                                 img_c_url = data_col.get("imagen_url")
                                 if img_c_url:

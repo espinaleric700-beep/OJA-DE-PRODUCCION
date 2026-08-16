@@ -39,13 +39,20 @@ if "keep_alive_thread_started" not in st.session_state:
     ping_thread.start()
 
 # ==========================================
-# CONFIGURACIÓN Y ESTILO VISUAL (MODO OSCURO)
+# CONFIGURACIÓN Y ESTILO VISUAL (MODO OSCURO Y RESPONSIVO)
 # ==========================================
 st.set_page_config(page_title="Pixel Thread - Gestión", layout="wide")
 
+# Inyección de Viewport + KeepAlive
 components.html(
     """
     <script>
+    // Asegurar viewport correcto en móviles
+    const meta = document.createElement('meta');
+    meta.name = 'viewport';
+    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    document.getElementsByTagName('head')[0].appendChild(meta);
+
     function keepAlive() {
         fetch(window.location.href, {mode: 'no-cors'}).then(() => {
             console.log('Keep-alive ping sent successfully');
@@ -60,13 +67,15 @@ components.html(
     width=0
 )
 
+# Estilos CSS generales y Media Queries para móviles
 st.markdown("""
     <style>
+    /* Estilos generales */
     .stApp { background-color: #0b0f19; color: #f3f4f6; }
     div.streamlit-expanderHeader { background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; color: #f9fafb; font-weight: 600; }
     div[data-testid="stForm"] { background-color: #111827; border: 1px solid #374151; border-radius: 10px; padding: 10px; }
     p, label, span, div { color: #e5e7eb; }
-    .stButton > button { border-radius: 4px; border: none; font-weight: 600; padding: 0.3rem 0.6rem; min-height: 2rem; font-size: 0.8rem; }
+    .stButton > button { border-radius: 4px; border: none; font-weight: 600; padding: 0.3rem 0.6rem; min-height: 2rem; font-size: 0.85rem; width: 100%; }
     
     /* Ocultar la barra lateral nativa de Streamlit completamente */
     [data-testid="stSidebar"] { display: none; }
@@ -79,6 +88,47 @@ st.markdown("""
         border-radius: 8px;
         padding: 8px 12px;
         font-size: 0.85rem;
+        margin-bottom: 8px;
+    }
+
+    /* ==========================================================================
+       ADAPTACIÓN PARA PANTALLAS MÓVILES (Pantallas de menos de 768px de ancho)
+       ========================================================================== */
+    @media (max-width: 768px) {
+        /* Ajustar padding principal de la app */
+        .block-container {
+            padding-left: 0.8rem !important;
+            padding-right: 0.8rem !important;
+            padding-top: 1rem !important;
+        }
+
+        /* Convertir columnas de Streamlit en filas apiladas en móvil */
+        div[data-testid="column"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            min-width: 100% !important;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Hacer que las pestañas (Tabs) tengan texto apilado/scrolleable */
+        div[data-baseweb="tab-list"] {
+            gap: 4px;
+            overflow-x: auto;
+        }
+        button[data-baseweb="tab"] {
+            font-size: 0.8rem !important;
+            padding: 8px 10px !important;
+        }
+
+        /* Ajustar entradas de texto e inputs para que no desborden */
+        .stTextInput input, .stSelectbox div, .stNumberInput input {
+            font-size: 14px !important;
+        }
+
+        /* Tablas e inputs compactos */
+        div[data-testid="stForm"] {
+            padding: 8px !important;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -144,7 +194,7 @@ if "sync_trigger" not in st.session_state: st.session_state["sync_trigger"] = 0
 count = st_autorefresh(interval=10000, key="datasync_counter")
 
 # ==============================================================================
-# ENCABEZADO Y CONTROL DE ACCESO SUPERIOR (SIN BARRA LATERAL)
+# ENCABEZADO Y CONTROL DE ACCESO SUPERIOR (OPTIMIZADO MÓVIL)
 # ==============================================================================
 col_titulo, col_header_info = st.columns([1.2, 2])
 
@@ -175,7 +225,6 @@ with col_header_info:
                     except Exception as e: st.error(f"Error: {e}")
         st.stop()
     else:
-        # Usuario Autenticado en la cabecera superior
         col_user_box, col_btn_sync, col_btn_logout = st.columns([2, 1.2, 1])
         
         with col_user_box:
@@ -592,5 +641,3 @@ with tabs[3]:
                 st.info("No hay usuarios adicionales registrados.")
         except Exception as e:
             st.error(f"Error al cargar usuarios: {e}")
-    else:
-        st.warning("⚠️ No tienes permisos para acceder a esta sección.")

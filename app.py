@@ -63,7 +63,6 @@ components.html(
 
 st.markdown("""
     <style>
-    /* Estilos Generales Dark Theme */
     .stApp { 
         background-color: #0b0e14;
         background-image: 
@@ -286,7 +285,10 @@ def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, histori
             except: lista_historial = []
         elif isinstance(historial_actual, list): lista_historial = historial_actual
     lista_historial.insert(0, nuevo_registro)
-    supabase.table("ordenes").update({"estado": nuevo_estado, "historial": json.dumps(lista_historial)}).eq("id", o_id).execute()
+    try:
+        supabase.table("ordenes").update({"estado": nuevo_estado, "historial": json.dumps(lista_historial)}).eq("id", o_id).execute()
+    except Exception as e:
+        st.error(f"Error actualizando estado en Supabase: {e}")
 
 def obtener_badge_estado(estado):
     colores = {
@@ -338,7 +340,7 @@ with col_header_info:
                             st.session_state.update({"autenticado": True, "usuario": usuario_input, "rol": usuario_encontrado.get("rol_id", "")})
                             st.rerun()
                         else: st.error("❌ Credenciales incorrectas.")
-                    except Exception as e: st.error(f"Error: {e}")
+                    except Exception as e: st.error(f"Error al verificar usuarios: {e}")
         st.stop()
     else:
         col_user_box, col_btn_sync, col_btn_logout = st.columns([2, 1.2, 1])
@@ -463,10 +465,13 @@ with tabs[0]:
                                         })
                                     
                                     if st.form_submit_button("💾 Guardar Cambios de Tallas"):
-                                        supabase.table("ordenes").update({"tallas_detalle": json.dumps(temp_tallas_actualizadas)}).eq("id", o_id).execute()
-                                        st.session_state[edit_mode_key] = False
-                                        st.success("¡Tallas actualizadas correctamente!")
-                                        st.rerun()
+                                        try:
+                                            supabase.table("ordenes").update({"tallas_detalle": json.dumps(temp_tallas_actualizadas)}).eq("id", o_id).execute()
+                                            st.session_state[edit_mode_key] = False
+                                            st.success("¡Tallas actualizadas correctamente!")
+                                            st.rerun()
+                                        except Exception as err:
+                                            st.error(f"Error al actualizar tallas: {err}")
                             else:
                                 if lista_tallas and len(lista_tallas) > 0:
                                     rows_html = ""
@@ -553,7 +558,7 @@ with tabs[0]:
                                         st.rerun()
 
         else: st.info("No hay órdenes encontradas.")
-    except Exception as e: st.error(f"Error: {e}")
+    except Exception as e: st.error(f"Error al cargar órdenes de Supabase: {e}")
 
 # ==============================================================================
 # TAB 2: NUEVA ORDEN
@@ -612,37 +617,40 @@ with tabs[1]:
         observaciones = st.text_area("Observaciones Generales")
         
         if st.form_submit_button("💾 Guardar Orden"):
-            urls_archivos = []
-            if archivos_subidos:
-                with st.spinner("Subiendo archivos..."):
-                    for arch in archivos_subidos:
-                        url_file = subir_a_supabase(arch.getvalue(), arch.name, bucket="disenos", carpeta="ordenes_archivos")
-                        urls_archivos.append({"nombre": arch.name, "url": url_file})
+            try:
+                urls_archivos = []
+                if archivos_subidos:
+                    with st.spinner("Subiendo archivos..."):
+                        for arch in archivos_subidos:
+                            url_file = subir_a_supabase(arch.getvalue(), arch.name, bucket="disenos", carpeta="ordenes_archivos")
+                            urls_archivos.append({"nombre": arch.name, "url": url_file})
 
-            historial_inicial = json.dumps([{
-                "usuario": st.session_state['usuario'], 
-                "de": "Inicio", 
-                "a": "Pendiente", 
-                "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }])
-            
-            supabase.table("ordenes").insert({
-                "numero_orden": numero_auto,
-                "nombre_cliente": nombre_cliente,
-                "telefono": telefono_cliente,
-                "tipo_servicio": tipo_servicio,
-                "fecha_entrega": str(fecha_entrega),
-                "total": total_orden,
-                "abono": abono_orden,
-                "restante": total_orden - abono_orden,
-                "observaciones": observaciones,
-                "tallas_detalle": json.dumps(dict_detalle_tallas),
-                "archivos": json.dumps(urls_archivos),
-                "estado": "Pendiente",
-                "historial": historial_inicial
-            }).execute()
-            st.success("¡Orden creada correctamente!")
-            st.rerun()
+                historial_inicial = json.dumps([{
+                    "usuario": st.session_state['usuario'], 
+                    "de": "Inicio", 
+                    "a": "Pendiente", 
+                    "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }])
+                
+                supabase.table("ordenes").insert({
+                    "numero_orden": numero_auto,
+                    "nombre_cliente": nombre_cliente,
+                    "telefono": telefono_cliente,
+                    "tipo_servicio": tipo_servicio,
+                    "fecha_entrega": str(fecha_entrega),
+                    "total": total_orden,
+                    "abono": abono_orden,
+                    "restante": total_orden - abono_orden,
+                    "observaciones": observaciones,
+                    "tallas_detalle": json.dumps(dict_detalle_tallas),
+                    "archivos": json.dumps(urls_archivos),
+                    "estado": "Pendiente",
+                    "historial": historial_inicial
+                }).execute()
+                st.success("¡Orden creada correctamente!")
+                st.rerun()
+            except Exception as err:
+                st.error(f"❌ Error al guardar la orden en Supabase: {err}")
 
 # ==============================================================================
 # TAB 3: ALMACÉN
@@ -709,11 +717,14 @@ with tabs[2]:
                 else:
                     try:
                         data_a_guardar = {}
+                        primera_imagen_url = ""
                         for col_key, col_data in st.session_state["colores_inventario_avanzado"].items():
                             img_file = col_data["imagen_file"]
                             img_url = ""
                             if img_file is not None:
                                 img_url = subir_a_supabase(img_file.getvalue(), img_file.name)
+                                if not primera_imagen_url:
+                                    primera_imagen_url = img_url
                             
                             data_a_guardar[col_key] = {
                                 "tallas": col_data["tallas"],
@@ -721,15 +732,18 @@ with tabs[2]:
                                 "hex": col_data.get("hex", "#3b82f6")
                             }
                         
+                        # Inserción adaptada a la estructura de columnas de Supabase
                         supabase.table("almacen").insert({
-                            "nombre_producto": inv_nombre,
+                            "nombre_producto": inv_nombre.strip(),
+                            "imagen_url": primera_imagen_url,
                             "tallas_existencias": json.dumps(data_a_guardar)
                         }).execute()
+                        
                         st.success("¡Inventario guardado con éxito!")
                         st.session_state["colores_inventario_avanzado"] = {}
                         st.rerun()
                     except Exception as err:
-                        st.error(f"Error al guardar inventario: {err}")
+                        st.error(f"❌ Error al guardar inventario en Supabase: {err}")
 
     st.markdown("---")
     st.subheader("📦 Productos en Inventario")
@@ -775,7 +789,7 @@ with tabs[2]:
                                 """
                                 st.markdown(filas_grid, unsafe_allow_html=True)
                                 
-                                img_url_color = info_color.get("imagen_url", "")
+                                img_url_color = info_color.get("imagen_url", "") or prod.get("imagen_url", "")
                                 with col_p_img:
                                     if img_url_color:
                                         st.image(img_url_color, use_container_width=True)
@@ -789,11 +803,11 @@ with tabs[2]:
                                 st.success("Producto eliminado.")
                                 st.rerun()
                             except Exception as ex:
-                                st.error(f"Error al eliminar: {ex}")
+                                st.error(f"Error al eliminar producto: {ex}")
         else:
             st.caption("No hay productos registrados en el almacén.")
     except Exception as e:
-        st.error(f"⚠️ **Error al cargar el almacén:** Asegúrate de que la tabla **`almacen`** existe en tu base de datos de Supabase.\n\nDetalle: {e}")
+        st.error(f"❌ Error al consultar la tabla 'almacen' en Supabase: {e}")
 
 # ==============================================================================
 # TAB 4: USUARIOS
@@ -817,7 +831,7 @@ with tabs[3]:
                         st.success(f"Usuario '{u_nombre}' creado con éxito.")
                         st.rerun()
                     except Exception as err:
-                        st.error(f"Error al registrar usuario: {err}")
+                        st.error(f"❌ Error al registrar usuario en Supabase: {err}")
                 else:
                     st.warning("Completa todos los campos.")
         
@@ -837,11 +851,14 @@ with tabs[3]:
                     with col_u2:
                         if u_n.lower() != "admin":
                             if st.button("🗑️ Eliminar", key=f"del_user_{u_id}"):
-                                supabase.table("usuarios").delete().eq("id", u_id).execute()
-                                st.rerun()
+                                try:
+                                    supabase.table("usuarios").delete().eq("id", u_id).execute()
+                                    st.rerun()
+                                except Exception as err:
+                                    st.error(f"Error al eliminar usuario: {err}")
             else:
                 st.caption("No hay usuarios adicionales registrados.")
         except Exception as e:
-            st.error(f"Error al listar usuarios: {e}")
+            st.error(f"❌ Error al consultar la tabla 'usuarios' en Supabase: {e}")
     else:
         st.warning("⚠️ No tienes permisos de Administrador para ver esta sección.")

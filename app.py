@@ -63,7 +63,6 @@ components.html(
 
 st.markdown("""
     <style>
-    /* Estilos Generales Dark Theme */
     .stApp { 
         background-color: #0b0e14;
         background-image: 
@@ -383,8 +382,6 @@ def obtener_badge_estado(estado):
 # Estado global
 if "autenticado" not in st.session_state:
     st.session_state.update({"autenticado": False, "usuario": "", "rol": ""})
-if "colores_inventario_avanzado" not in st.session_state:
-    st.session_state["colores_inventario_avanzado"] = {}
 if "sync_trigger" not in st.session_state:
     st.session_state["sync_trigger"] = 0
 
@@ -611,7 +608,6 @@ with tabs[0]:
 
                             if st.session_state[edit_mode_key]:
                                 st.info("Modo de edición manual activo:")
-                                nuevo_detalle_tallas = []
                                 with st.form(key=f"form_edit_tallas_{o_id}"):
                                     tallas_existentes_map = {
                                         item.get("talla"): item
@@ -928,10 +924,10 @@ with tabs[1]:
             st.rerun()
 
 # ==============================================================================
-# TAB 3: ALMACÉN
+# TAB 3: ALMACÉN (CORREGIDO CON GESTIÓN DE MATRIZ DE TALLAS Y COLORES)
 # ==============================================================================
 with tabs[2]:
-    st.subheader("📦 Control de Inventario")
+    st.subheader("📦 Control de Inventario y Stock")
     puede_modificar = st.session_state["rol"] in [
         "Administrador",
         "Recepción",
@@ -939,61 +935,115 @@ with tabs[2]:
     ]
 
     if puede_modificar:
-        with st.expander("➕ Agregar Producto", expanded=False):
-            inv_nombre = st.text_input(
-                "NOMBRE DE LA PRENDA", key="input_nombre_prenda_color_img"
-            )
-            st.markdown("---")
-            st.markdown("🎨 **Añadir Color e Imagen**")
+        with st.expander("➕ Agregar Nuevo Producto o Prenda", expanded=False):
+            with st.form("form_agregar_prenda_inventario"):
+                inv_nombre = st.text_input("Nombre de la Prenda (Ej: Playera Heavyweight, Hoodie, Polo)")
+                
+                st.markdown("---")
+                st.markdown("🎨 **Definir Colores y Tallas Iniciales**")
+                
+                col_c_input, col_c_picker = st.columns([2, 1])
+                with col_c_input:
+                    colores_texto_input = st.text_input("Colores (separados por coma)", value="Blanco, Negro, Azul Marino")
+                with col_c_picker:
+                    st.caption("Usa el selector para referencia")
+                    st.color_picker("Color Ref", "#3b82f6", key="ref_picker_inv")
 
-            col_picker, col_text = st.columns([1, 2])
-            with col_picker:
-                color_picker_val = st.color_picker(
-                    "Tono", "#3b82f6", key="picker_color_hex_v2"
-                )
-            with col_text:
-                nuevo_color = st.text_input(
-                    "NOMBRE DEL COLOR",
-                    value=color_picker_val,
-                    key="input_nuevo_color_nombre_v2",
-                )
+                st.markdown("📊 **Stock inicial por Talla (Matriz general o por defecto)**")
+                # Creamos inputs numéricos rápidos para las tallas principales
+                cols_st_1 = st.columns(6)
+                stock_inicial_tallas = {}
+                
+                tallas_muestra = ["S", "M", "L", "XL", "2XL", "3XL"]
+                for i, sz in enumerate(tallas_muestra):
+                    with cols_st_1[i]:
+                        stock_inicial_tallas[sz] = st.number_input(f"Talla {sz}", min_value=0, value=10, step=1, key=f"inv_init_{sz}")
 
-            foto_color = st.file_uploader(
-                f"🖼️ Imagen para `{nuevo_color}`",
-                type=["png", "jpg", "jpeg"],
-                key=f"uploader_img_{nuevo_color}",
-            )
+                if st.form_submit_button("💾 Guardar Producto en Almacén"):
+                    if inv_nombre.strip():
+                        try:
+                            # Procesar lista de colores
+                            lista_colores_procesados = [c.strip() for c in colores_texto_input.split(",") if c.strip()]
+                            
+                            # Estructura de inventario detallada por color y talla
+                            matriz_inventario = {}
+                            for col_item in lista_colores_procesados:
+                                matriz_inventario[col_item] = stock_inicial_tallas
 
-            if st.button("➕ Añadir Color"):
-                if nuevo_color.strip():
-                    c_clean = nuevo_color.strip()
-                    if c_clean not in st.session_state["colores_inventario_avanzado"]:
-                        url_img_color = ""
-                        if foto_color:
-                            url_img_color = subir_a_supabase(
-                                foto_color.getvalue(),
-                                foto_color.name,
-                                bucket="disenos",
-                                carpeta="inventario_imgs",
-                            )
-                        st.session_state["colores_inventario_avanzado"][c_clean] = {
-                            "hex": color_picker_val,
-                            "imagen": url_img_color,
-                        }
-                        st.success(f"Color {c_clean} añadido con éxito.")
-                        st.rerun()
+                            # Guardar en la tabla 'inventario' de Supabase
+                            supabase.table("inventario").insert({
+                                "nombre": inv_nombre.strip(),
+                                "colores": json.dumps(lista_colores_procesados),
+                                "stock_detallado": json.dumps(matriz_inventario),
+                                "stock": sum(stock_inicial_tallas.values()) * len(lista_colores_procesados)
+                            }).execute()
+                            
+                            st.success(f"¡Prenda '{inv_nombre}' agregada al inventario correctamente!")
+                            st.rerun()
+                        except Exception as err:
+                            st.error(f"Error al guardar en Supabase: {err}")
+                    else:
+                        st.warning("El nombre de la prenda es obligatorio.")
 
     st.markdown("---")
     st.markdown("📋 **Inventario Actual en Base de Datos**")
+    
     try:
         res_inv = supabase.table("inventario").select("*").execute()
         if res_inv.data:
             for item_inv in res_inv.data:
-                st.write(f"- **{item_inv.get('nombre', 'Prenda')}**: {item_inv.get('stock', 0)} unidades")
+                inv_id = item_inv.get("id")
+                inv_nombre_prenda = item_inv.get("nombre", "Sin Nombre")
+                stock_total_db = item_inv.get("stock", 0)
+                colores_db = item_inv.get("colores", "[]")
+                stock_detallado_db = item_inv.get("stock_detallado", "{}")
+
+                with st.container(border=True):
+                    col_info_inv, col_action_inv = st.columns([3, 1])
+                    with col_info_inv:
+                        st.markdown(f"### 👕 {inv_nombre_prenda}")
+                        st.write(f"**Stock Total Global:** `{stock_total_db} unidades`")
+                        
+                        try:
+                            lista_cols = json.loads(colores_db) if isinstance(colores_db, str) else colores_db
+                            detalle_matriz = json.loads(stock_detallado_db) if isinstance(stock_detallado_db, str) else stock_detallado_db
+                            
+                            if lista_cols:
+                                st.markdown(f"🎨 **Colores disponibles:** {', '.join(lista_cols)}")
+                            
+                            if detalle_matriz and isinstance(detalle_matriz, dict):
+                                st.markdown("📊 **Desglose de Stock por Talla y Color:**")
+                                # Renderizar tabla de matriz de inventario
+                                html_matriz = '<table class="inventory-grid-table"><thead><tr><th>Color / Talla</th>'
+                                for sz in tallas_disponibles:
+                                    html_matriz += f'<th>{sz}</th>'
+                                html_matriz += '</tr></thead><tbody>'
+                                
+                                for col_key, tallas_val in detalle_matriz.items():
+                                    html_matriz += f'<tr><td style="text-align: left; font-weight: bold; color: #58a6ff;">{col_key}</td>'
+                                    for sz in tallas_disponibles:
+                                        cant_sz = tallas_val.get(sz, 0) if isinstance(tallas_val, dict) else 0
+                                        html_matriz += f'<td>{cant_sz}</td>'
+                                    html_matriz += '</tr>'
+                                html_matriz += '</tbody></table>'
+                                st.markdown(html_matriz, unsafe_allow_html=True)
+                        except Exception as e:
+                            st.caption(f"Detalle de stock en formato simple.")
+
+                    with col_action_inv:
+                        if puede_modificar:
+                            st.markdown("#### Acciones")
+                            if st.button("🗑️ Eliminar Prenda", key=f"btn_del_inv_{inv_id}"):
+                                try:
+                                    supabase.table("inventario").delete().eq("id", inv_id).execute()
+                                    st.success("Prenda eliminada.")
+                                    st.rerun()
+                                except Exception as err:
+                                    st.error(f"Error: {err}")
         else:
-            st.info("No hay productos registrados en el inventario.")
+            st.info("No hay productos registrados en el inventario de Supabase actualmente.")
     except Exception as e:
-        st.info("Módulo de inventario listo para sincronización con Supabase.")
+        st.error(f"Error al conectar con la tabla de inventario: {e}")
 
 # ==============================================================================
 # TAB 4: USUARIOS (ADMINISTRACIÓN)

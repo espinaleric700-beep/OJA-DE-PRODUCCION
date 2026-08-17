@@ -437,12 +437,7 @@ with tabs[0]:
                                     st.success("¡Actualizado!")
                                     st.rerun()
                     
-                    expander_key_state = f"exp_open_{o_id}"
-                    if expander_key_state not in st.session_state:
-                        st.session_state[expander_key_state] = False
-
-                    with st.expander("📂 Ver detalles completos", expanded=st.session_state[expander_key_state]):
-                        st.session_state[expander_key_state] = False
+                    with st.expander("📂 Ver detalles completos", expanded=False):
                         edit_order_mode_key = f"edit_order_full_mode_{o_id}"
                         if edit_order_mode_key not in st.session_state:
                             st.session_state[edit_order_mode_key] = False
@@ -1052,8 +1047,8 @@ with tabs[3]:
                             if u_n.lower() != "admin":
                                 if st.button("🗑️ Eliminar", key=f"del_user_{u_id}"):
                                     try:
-                                        supabase.table("usuarios").delete().eq("id", u_id).execute()
-                                        st.rerun()
+                                    	supabase.table("usuarios").delete().eq("id", u_id).execute()
+                                    	st.rerun()
                                     except Exception as err:
                                         st.error(f"Error al eliminar usuario: {err}")
 

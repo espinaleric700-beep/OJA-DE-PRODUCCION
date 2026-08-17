@@ -283,10 +283,10 @@ def obtener_siguiente_numero_orden():
     except Exception: pass
     return "0000001"
 
-def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, historial_actual, usuario_actual):
+def actualizar_estado_con_historial(o_id, estado_anterior, nuevo_estado, historial_actual, usuario_actual, rol_actual):
     if nuevo_estado == estado_anterior: return
     ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    nuevo_registro = {"usuario": usuario_actual, "de": estado_anterior, "a": nuevo_estado, "fecha": ahora}
+    nuevo_registro = {"usuario": usuario_actual, "rol": rol_actual, "de": estado_anterior, "a": nuevo_estado, "fecha": ahora}
     lista_historial = []
     if historial_actual:
         if isinstance(historial_actual, str):
@@ -433,7 +433,7 @@ with tabs[0]:
                         with cols_action[1]:
                             if st.button("Cambiar", key=f"btn_quick_{o_id}"):
                                 if nuevo_estado_sel != estado_actual:
-                                    actualizar_estado_con_historial(o_id, estado_actual, nuevo_estado_sel, historial_db, st.session_state['usuario'])
+                                    actualizar_estado_con_historial(o_id, estado_actual, nuevo_estado_sel, historial_db, st.session_state['usuario'], st.session_state['rol'])
                                     st.success("¡Actualizado!")
                                     st.rerun()
                     
@@ -442,7 +442,7 @@ with tabs[0]:
                         st.session_state[expander_key_state] = False
 
                     with st.expander("📂 Ver detalles completos", expanded=st.session_state[expander_key_state]):
-                        st.session_state[expander_key_state] = True
+                        st.session_state[expander_key_state] = False
                         edit_order_mode_key = f"edit_order_full_mode_{o_id}"
                         if edit_order_mode_key not in st.session_state:
                             st.session_state[edit_order_mode_key] = False
@@ -649,7 +649,8 @@ with tabs[0]:
                             registros = json.loads(historial_db) if isinstance(historial_db, str) else historial_db
                             if registros:
                                 for reg in registros[:5]:
-                                    st.caption(f"🕒 {reg.get('fecha', '-')} | 👤 {reg.get('usuario', '-')}: {reg.get('de', '')} ➡️ {reg.get('a', '')}")
+                                    rol_reg = f" ({reg.get('rol')})" if reg.get('rol') else ""
+                                    st.caption(f"🕒 {reg.get('fecha', '-')} | 👤 {reg.get('usuario', '-')}{rol_reg}: {reg.get('de', '')} ➡️ {reg.get('a', '')}")
                         except: st.caption("Sin historial.")
 
                         if st.session_state['rol'] == "Administrador":
@@ -767,7 +768,8 @@ with tabs[1]:
                             urls_archivos.append({"nombre": arch.name, "url": url_file})
 
                 historial_inicial = json.dumps([{
-                    "usuario": st.session_state['usuario'], 
+                    "usuario": st.session_state['usuario'],
+                    "rol": st.session_state['rol'],
                     "de": "Inicio", 
                     "a": "Pendiente", 
                     "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")

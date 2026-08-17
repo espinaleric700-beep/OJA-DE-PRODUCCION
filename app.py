@@ -7,6 +7,7 @@ import urllib.request
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_js_eval import streamlit_js_eval
+from streamlit_autorefresh import st_autorefresh
 from supabase import create_client
 
 # ==============================================================================

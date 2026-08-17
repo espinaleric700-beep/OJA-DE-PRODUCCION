@@ -76,6 +76,12 @@ st.markdown("""
     
     [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
 
+    /* Ocultar insignia/botón de GitHub/Fork de Streamlit Cloud */
+    [data-testid="stToolbar"], header[data-testid="stHeader"], footer, div.viewerBadge_container__1QSob, .viewerBadge_link__1S137 {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
     /* Solución definitiva para evitar apertura accidental de selects y baseweb al hacer scroll táctil */
     select, [data-baseweb="select"], [data-baseweb="select"] *, div[data-baseweb="select"] div {
         touch-action: pan-y !important;

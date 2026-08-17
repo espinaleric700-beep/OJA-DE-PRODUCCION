@@ -6,7 +6,6 @@ import time
 import urllib.request
 import streamlit as st
 import streamlit.components.v1 as components
-from streamlit_autorefresh import st_autorefresh
 from streamlit_js_eval import streamlit_js_eval
 from supabase import create_client
 
@@ -437,7 +436,7 @@ with tabs[0]:
                                     st.success("¡Actualizado!")
                                     st.rerun()
                     
-                    with st.expander("📂 Ver detalles completos", expanded=False):
+                    with st.expander("Ver detalles completos", expanded=False):
                         edit_order_mode_key = f"edit_order_full_mode_{o_id}"
                         if edit_order_mode_key not in st.session_state:
                             st.session_state[edit_order_mode_key] = False
